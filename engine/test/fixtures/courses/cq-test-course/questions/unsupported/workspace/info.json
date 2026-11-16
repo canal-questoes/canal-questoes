@@ -1,0 +1,11 @@
+{
+  "uuid": "80bea20a-c00c-405f-bb36-e5b47a598622",
+  "title": "Questão com workspace",
+  "topic": "Teste",
+  "type": "v3",
+  "workspaceOptions": {
+    "image": "prairielearn/workspace-vscode-python",
+    "port": 8080,
+    "home": "/home/coder"
+  }
+}

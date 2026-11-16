@@ -1,0 +1,9 @@
+{
+  "name": "canal-questoes",
+  "description": "Opera o canal-questoes pelo agente: o servidor MCP do cq (as ferramentas do catálogo e as locais da pilha) e as skills dos fluxos do professor, com as operações destrutivas em duas fases e a confirmação do operador.",
+  "version": "0.1.0",
+  "author": {
+    "name": "canal-questoes"
+  },
+  "license": "AGPL-3.0-or-later"
+}

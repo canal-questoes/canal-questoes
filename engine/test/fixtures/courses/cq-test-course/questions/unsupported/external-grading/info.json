@@ -1,0 +1,11 @@
+{
+  "uuid": "e71a99fb-a424-407d-aca1-5c5c1d5faf2e",
+  "title": "Correção externa",
+  "topic": "Teste",
+  "type": "v3",
+  "gradingMethod": "External",
+  "externalGradingOptions": {
+    "image": "prairielearn/grader-python",
+    "entrypoint": "/python_autograder/run.sh"
+  }
+}

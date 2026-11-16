@@ -1,0 +1,12 @@
+# Testes instáveis conhecidos, um nó do pytest por linha, para a repetição única do CI (ops/ci/ci_suite.py).
+# Arquivo gerado pela exportação pública (ops/export/export_public.py). Não edite à mão.
+tests/integration/test_engine_failures.py::test_second_loss_of_the_tree_creates_a_round_two_refetch
+tests/integration/test_dispatch_closing.py::test_bot_without_access_until_close_leaves_messages_untouched
+tests/integration/test_engine_failures.py::test_engine_down_at_grading_keeps_submission_grading_notifies_once_and_retries_without_limit
+tests/integration/test_invite_email_task.py::test_offering_closed_after_a_temporary_failure_cancels_with_the_codes_generated
+tests/system/test_git_fetcher.py
+tests/integration/test_free_messages.py::test_off_reply_at_most_once_per_interval_per_student
+tests/integration/test_telegram_timing.py::test_times_with_thirty_students_measured_on_the_fake_bot_api
+tests/integration/test_digest.py::test_worker_down_at_time_and_back_the_same_day_sends_once
+tests/integration/test_dispatch_closing.py::test_bot_access_back_before_close_delivers_the_question
+tests/integration/test_dispatch_opening.py::test_media_blocked_by_403_blocks_the_endpoint_and_the_question_is_not_sent

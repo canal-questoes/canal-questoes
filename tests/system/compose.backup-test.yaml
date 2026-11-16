@@ -1,0 +1,9 @@
+# Sobreposição só do teste de backup e restauração, para semear e comparar os dois bancos.
+# Usada só por tests/system/test_backup_restore.py, nos projetos cq-systest-bkp-src e
+# cq-systest-bkp-dst, com `-f compose.yaml -f tests/system/compose.backup-test.yaml`: publica o Postgres no
+# loopback, numa porta livre escolhida pelo teste (CQ_TEST_PG_PORT), para a semeadura e a comparação por DSN.
+# Nada mais: nenhum serviço novo, nenhuma montagem, nenhum segredo.
+services:
+  postgres:
+    ports:
+      - "127.0.0.1:${CQ_TEST_PG_PORT:?defina CQ_TEST_PG_PORT (porta livre do teste)}:5432"

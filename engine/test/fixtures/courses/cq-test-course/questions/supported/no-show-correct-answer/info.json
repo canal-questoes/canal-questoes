@@ -1,0 +1,8 @@
+{
+  "uuid": "c62b56ea-ac44-44ba-9112-95752f6275c2",
+  "title": "Sem mostrar a resposta correta",
+  "topic": "Teste",
+  "tags": ["teste"],
+  "type": "v3",
+  "showCorrectAnswer": false
+}

@@ -1,0 +1,35 @@
+# C4 nível 2 — containers
+direction: down
+
+classes: {
+  nosso: {style.fill: "#EEEDFE"; style.stroke: "#534AB7"}
+  motor: {style.fill: "#E1F5EE"; style.stroke: "#0F6E56"}
+  externo: {style.fill: "#F1EFE8"; style.stroke: "#5F5E5A"}
+}
+
+cli: "CLI + servidor MCP\n(pacote cliente)" {class: externo}
+integracoes: "Integrações\n(banco de questões, feedback)" {class: externo}
+repos: "Repositórios PL (git)" {class: externo}
+
+sistema: "canal-questoes (docker compose)" {
+  api: "api\nAPI HTTP, sem estado" {class: nosso}
+  worker: "worker\nbots, agendador, filas" {class: nosso}
+  engine: "engine\nimagem do PL + orquestrador TS\nsó rede interna, sem saída; não-root" {class: motor}
+  postgres: "postgres\nestado, eventos, filas" {shape: cylinder; class: externo}
+  cache: "volume repos\n(somente leitura p/ engine)" {shape: stored_data; class: externo}
+
+  api <-> postgres
+  worker <-> postgres: "filas (SKIP LOCKED)\navisos (LISTEN/NOTIFY)"
+  worker -> engine: "HTTP interno"
+  worker -> cache: "git fetch"
+  engine -> cache: "lê"
+}
+
+telegram: "Telegram (Bot API)" {class: externo}
+email: "E-mail (SMTP)" {class: externo}
+
+cli -> sistema.api
+integracoes -> sistema.api: "disparos; consulta de eventos"
+sistema.worker -> repos
+sistema.worker <-> telegram
+sistema.worker -> email

@@ -1,0 +1,504 @@
+{
+  "version": "1",
+  "operations": [
+    {
+      "id": "system.health",
+      "method": "GET",
+      "path": "/health",
+      "permission": null,
+      "cli": "health",
+      "mcp": {
+        "exposed": false,
+        "reason": "Operação de diagnóstico; o doctor decide."
+      },
+      "destructive": false
+    },
+    {
+      "id": "people.register",
+      "method": "POST",
+      "path": "/v1/people",
+      "permission": "people:write",
+      "cli": "people add",
+      "mcp": {
+        "exposed": false,
+        "reason": "A identidade passaria pelo modelo."
+      },
+      "destructive": false
+    },
+    {
+      "id": "people.list",
+      "method": "GET",
+      "path": "/v1/people",
+      "permission": "people:read",
+      "cli": "people list",
+      "mcp": {
+        "exposed": true,
+        "tool": "list_people",
+        "confirm": false
+      },
+      "destructive": false
+    },
+    {
+      "id": "people.get",
+      "method": "GET",
+      "path": "/v1/people/{ref}",
+      "permission": "people:read",
+      "cli": "people show",
+      "mcp": {
+        "exposed": true,
+        "tool": "get_person",
+        "confirm": false
+      },
+      "destructive": false
+    },
+    {
+      "id": "identity.reveal",
+      "method": "POST",
+      "path": "/v1/identity/reveal",
+      "permission": "identity:reveal",
+      "cli": "identity reveal",
+      "mcp": {
+        "exposed": true,
+        "tool": "reveal_identities",
+        "confirm": true
+      },
+      "destructive": false
+    },
+    {
+      "id": "tokens.create",
+      "method": "POST",
+      "path": "/v1/tokens",
+      "permission": "tokens:manage",
+      "cli": "tokens create",
+      "mcp": {
+        "exposed": false,
+        "reason": "O segredo passaria pelo modelo."
+      },
+      "destructive": false
+    },
+    {
+      "id": "tokens.list",
+      "method": "GET",
+      "path": "/v1/tokens",
+      "permission": "tokens:manage",
+      "cli": "tokens list",
+      "mcp": {
+        "exposed": false,
+        "reason": "Gestão de tokens de API só pelo CLI."
+      },
+      "destructive": false
+    },
+    {
+      "id": "tokens.revoke",
+      "method": "POST",
+      "path": "/v1/tokens/{token_id}/revoke",
+      "permission": "tokens:manage",
+      "cli": "tokens revoke",
+      "mcp": {
+        "exposed": false,
+        "reason": "Gestão de tokens de API só pelo CLI."
+      },
+      "destructive": false
+    },
+    {
+      "id": "events.list",
+      "method": "GET",
+      "path": "/v1/events",
+      "permission": "events:read",
+      "cli": "events list",
+      "mcp": {
+        "exposed": true,
+        "tool": "list_events",
+        "confirm": false
+      },
+      "destructive": false
+    },
+    {
+      "id": "offerings.create",
+      "method": "POST",
+      "path": "/v1/offerings",
+      "permission": "offerings:write",
+      "cli": "offerings create",
+      "mcp": {
+        "exposed": true,
+        "tool": "create_offering",
+        "confirm": false
+      },
+      "destructive": false
+    },
+    {
+      "id": "offerings.list",
+      "method": "GET",
+      "path": "/v1/offerings",
+      "permission": "offerings:read",
+      "cli": "offerings list",
+      "mcp": {
+        "exposed": true,
+        "tool": "list_offerings",
+        "confirm": false
+      },
+      "destructive": false
+    },
+    {
+      "id": "offerings.get",
+      "method": "GET",
+      "path": "/v1/offerings/{ref}",
+      "permission": "offerings:read",
+      "cli": "offerings show",
+      "mcp": {
+        "exposed": true,
+        "tool": "get_offering",
+        "confirm": false
+      },
+      "destructive": false
+    },
+    {
+      "id": "offerings.close",
+      "method": "POST",
+      "path": "/v1/offerings/{ref}/close",
+      "permission": "offerings:write",
+      "cli": "offerings close",
+      "mcp": {
+        "exposed": true,
+        "tool": "close_offering",
+        "confirm": false
+      },
+      "destructive": false
+    },
+    {
+      "id": "offerings.prepare_archive",
+      "method": "POST",
+      "path": "/v1/offerings/{ref}/archive/prepare",
+      "permission": "offerings:write",
+      "cli": "offerings archive prepare",
+      "mcp": {
+        "exposed": true,
+        "tool": "prepare_archive_offering",
+        "confirm": false
+      },
+      "destructive": false
+    },
+    {
+      "id": "offerings.archive",
+      "method": "POST",
+      "path": "/v1/offerings/{ref}/archive",
+      "permission": "offerings:write",
+      "cli": "offerings archive confirm",
+      "mcp": {
+        "exposed": true,
+        "tool": "archive_offering",
+        "confirm": true
+      },
+      "destructive": true
+    },
+    {
+      "id": "bots.register",
+      "method": "PUT",
+      "path": "/v1/offerings/{ref}/bot",
+      "permission": "bots:manage",
+      "cli": "bots register",
+      "mcp": {
+        "exposed": false,
+        "reason": "O token do bot é segredo e não passa pelo modelo."
+      },
+      "destructive": false
+    },
+    {
+      "id": "bots.activate",
+      "method": "POST",
+      "path": "/v1/offerings/{ref}/bot/activate",
+      "permission": "bots:manage",
+      "cli": "bots activate",
+      "mcp": {
+        "exposed": true,
+        "tool": "activate_bot",
+        "confirm": false
+      },
+      "destructive": false
+    },
+    {
+      "id": "bots.get",
+      "method": "GET",
+      "path": "/v1/offerings/{ref}/bot",
+      "permission": "offerings:read",
+      "cli": "bots show",
+      "mcp": {
+        "exposed": true,
+        "tool": "get_bot",
+        "confirm": false
+      },
+      "destructive": false
+    },
+    {
+      "id": "team.link",
+      "method": "POST",
+      "path": "/v1/offerings/{ref}/team-links",
+      "permission": "offerings:write",
+      "cli": "team link",
+      "mcp": {
+        "exposed": false,
+        "reason": "O link de equipe é uma credencial e não passa pelo modelo."
+      },
+      "destructive": false
+    },
+    {
+      "id": "students.import",
+      "method": "POST",
+      "path": "/v1/offerings/{ref}/students",
+      "permission": "people:write",
+      "cli": "students import",
+      "mcp": {
+        "exposed": true,
+        "tool": "import_students",
+        "confirm": false
+      },
+      "destructive": false
+    },
+    {
+      "id": "students.summary",
+      "method": "GET",
+      "path": "/v1/offerings/{ref}/students/summary",
+      "permission": "offerings:read",
+      "cli": "students summary",
+      "mcp": {
+        "exposed": true,
+        "tool": "get_students_summary",
+        "confirm": false
+      },
+      "destructive": false
+    },
+    {
+      "id": "invites.prepare_send",
+      "method": "POST",
+      "path": "/v1/offerings/{ref}/invites/prepare",
+      "permission": "offerings:write",
+      "cli": "invites send prepare",
+      "mcp": {
+        "exposed": true,
+        "tool": "prepare_send_invites",
+        "confirm": false
+      },
+      "destructive": false
+    },
+    {
+      "id": "invites.send",
+      "method": "POST",
+      "path": "/v1/offerings/{ref}/invites",
+      "permission": "offerings:write",
+      "cli": "invites send confirm",
+      "mcp": {
+        "exposed": true,
+        "tool": "send_invites",
+        "confirm": true
+      },
+      "destructive": true
+    },
+    {
+      "id": "invites.resend",
+      "method": "POST",
+      "path": "/v1/offerings/{ref}/invites/resend",
+      "permission": "offerings:write",
+      "cli": "invites resend",
+      "mcp": {
+        "exposed": true,
+        "tool": "resend_invites",
+        "confirm": false
+      },
+      "destructive": false
+    },
+    {
+      "id": "dispatches.prepare",
+      "method": "POST",
+      "path": "/v1/offerings/{ref}/dispatches",
+      "permission": "offerings:write",
+      "cli": "dispatches prepare",
+      "mcp": {
+        "exposed": true,
+        "tool": "prepare_dispatch",
+        "confirm": false
+      },
+      "destructive": false
+    },
+    {
+      "id": "dispatches.get",
+      "method": "GET",
+      "path": "/v1/offerings/{ref}/dispatches/{dispatch_id}",
+      "permission": "offerings:read",
+      "cli": "dispatches show",
+      "mcp": {
+        "exposed": true,
+        "tool": "get_dispatch",
+        "confirm": false
+      },
+      "destructive": false
+    },
+    {
+      "id": "dispatches.list",
+      "method": "GET",
+      "path": "/v1/offerings/{ref}/dispatches",
+      "permission": "offerings:read",
+      "cli": "dispatches list",
+      "mcp": {
+        "exposed": true,
+        "tool": "list_dispatches",
+        "confirm": false
+      },
+      "destructive": false
+    },
+    {
+      "id": "dispatches.confirm",
+      "method": "POST",
+      "path": "/v1/offerings/{ref}/dispatches/{dispatch_id}/confirm",
+      "permission": "offerings:write",
+      "cli": "dispatches confirm",
+      "mcp": {
+        "exposed": true,
+        "tool": "confirm_dispatch",
+        "confirm": true
+      },
+      "destructive": true
+    },
+    {
+      "id": "dispatches.cancel",
+      "method": "POST",
+      "path": "/v1/offerings/{ref}/dispatches/{dispatch_id}/cancel",
+      "permission": "offerings:write",
+      "cli": "dispatches cancel",
+      "mcp": {
+        "exposed": true,
+        "tool": "cancel_dispatch",
+        "confirm": false
+      },
+      "destructive": false
+    },
+    {
+      "id": "messages.list",
+      "method": "GET",
+      "path": "/v1/offerings/{ref}/messages",
+      "permission": "offerings:read",
+      "cli": "messages list",
+      "mcp": {
+        "exposed": false,
+        "reason": "Texto livre de aluno; fica fora do MCP nesta versão."
+      },
+      "destructive": false
+    },
+    {
+      "id": "offerings.update_settings",
+      "method": "PATCH",
+      "path": "/v1/offerings/{ref}/settings",
+      "permission": "offerings:write",
+      "cli": "offerings settings",
+      "mcp": {
+        "exposed": true,
+        "tool": "update_offering_settings",
+        "confirm": false
+      },
+      "destructive": false
+    },
+    {
+      "id": "reports.get",
+      "method": "GET",
+      "path": "/v1/offerings/{ref}/dispatches/{dispatch_id}/report",
+      "permission": "offerings:read",
+      "cli": "reports show",
+      "mcp": {
+        "exposed": true,
+        "tool": "get_dispatch_report",
+        "confirm": false
+      },
+      "destructive": false
+    },
+    {
+      "id": "reports.list_versions",
+      "method": "GET",
+      "path": "/v1/offerings/{ref}/dispatches/{dispatch_id}/report/versions",
+      "permission": "offerings:read",
+      "cli": "reports versions",
+      "mcp": {
+        "exposed": true,
+        "tool": "list_report_versions",
+        "confirm": false
+      },
+      "destructive": false
+    },
+    {
+      "id": "reports.resend_summary",
+      "method": "POST",
+      "path": "/v1/offerings/{ref}/dispatches/{dispatch_id}/report/resend",
+      "permission": "offerings:write",
+      "cli": "reports resend",
+      "mcp": {
+        "exposed": true,
+        "tool": "resend_report_summary",
+        "confirm": false
+      },
+      "destructive": false
+    },
+    {
+      "id": "offerings.get_digest",
+      "method": "GET",
+      "path": "/v1/offerings/{ref}/digest",
+      "permission": "offerings:read",
+      "cli": "offerings digest show",
+      "mcp": {
+        "exposed": true,
+        "tool": "get_offering_digest",
+        "confirm": false
+      },
+      "destructive": false
+    },
+    {
+      "id": "offerings.update_digest",
+      "method": "PATCH",
+      "path": "/v1/offerings/{ref}/digest",
+      "permission": "offerings:write",
+      "cli": "offerings digest set",
+      "mcp": {
+        "exposed": true,
+        "tool": "update_offering_digest",
+        "confirm": false
+      },
+      "destructive": false
+    },
+    {
+      "id": "system.doctor",
+      "method": "GET",
+      "path": "/v1/system/doctor",
+      "permission": "offerings:read",
+      "cli": "doctor",
+      "mcp": {
+        "exposed": true,
+        "tool": "run_doctor",
+        "confirm": false
+      },
+      "destructive": false
+    },
+    {
+      "id": "offerings.prepare_purge",
+      "method": "POST",
+      "path": "/v1/offerings/{ref}/purge/prepare",
+      "permission": "people:write",
+      "cli": "offerings purge prepare",
+      "mcp": {
+        "exposed": true,
+        "tool": "prepare_purge_offering",
+        "confirm": false
+      },
+      "destructive": false
+    },
+    {
+      "id": "offerings.purge",
+      "method": "POST",
+      "path": "/v1/offerings/{ref}/purge",
+      "permission": "people:write",
+      "cli": "offerings purge confirm",
+      "mcp": {
+        "exposed": true,
+        "tool": "purge_offering",
+        "confirm": true
+      },
+      "destructive": true
+    }
+  ]
+}

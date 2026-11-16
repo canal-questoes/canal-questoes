@@ -1,0 +1,4 @@
+Use len(s) assim:
+
+if a < b:
+    print("ok & fim")

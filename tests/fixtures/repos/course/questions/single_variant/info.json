@@ -1,0 +1,10 @@
+{
+  "uuid": "5f0c7a52-2d1e-4b7a-9c3e-000000000017",
+  "title": "Variante única",
+  "topic": "Teste",
+  "tags": [
+    "teste"
+  ],
+  "type": "v3",
+  "singleVariant": true
+}

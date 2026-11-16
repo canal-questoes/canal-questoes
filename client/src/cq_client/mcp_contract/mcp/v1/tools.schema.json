@@ -1,0 +1,150 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://canal-questoes.invalid/contracts/mcp/v1/tools.schema.json",
+  "title": "Ferramentas do servidor MCP",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "tools"
+  ],
+  "properties": {
+    "version": {
+      "const": "1"
+    },
+    "tools": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "source",
+          "title",
+          "description",
+          "annotations",
+          "requires_user_interaction",
+          "input_schema",
+          "output_schema"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "pattern": "^[a-z]+(_[a-z]+)+$"
+          },
+          "source": {
+            "oneOf": [
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "kind",
+                  "operation"
+                ],
+                "properties": {
+                  "kind": {
+                    "const": "catalog"
+                  },
+                  "operation": {
+                    "type": "string",
+                    "pattern": "^[a-z]+\\.[a-z_]+$"
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "kind",
+                  "command"
+                ],
+                "properties": {
+                  "kind": {
+                    "const": "local"
+                  },
+                  "command": {
+                    "enum": [
+                      "up",
+                      "down",
+                      "status",
+                      "logs"
+                    ]
+                  },
+                  "phase": {
+                    "enum": [
+                      "prepare",
+                      "confirm"
+                    ]
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "command": {
+                      "const": "down"
+                    }
+                  }
+                },
+                "then": {
+                  "required": [
+                    "phase"
+                  ]
+                },
+                "else": {
+                  "not": {
+                    "required": [
+                      "phase"
+                    ]
+                  }
+                }
+              }
+            ]
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1
+          },
+          "annotations": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "readOnlyHint",
+              "destructiveHint",
+              "idempotentHint",
+              "openWorldHint"
+            ],
+            "properties": {
+              "readOnlyHint": {
+                "type": "boolean"
+              },
+              "destructiveHint": {
+                "type": "boolean"
+              },
+              "idempotentHint": {
+                "type": "boolean"
+              },
+              "openWorldHint": {
+                "type": "boolean"
+              }
+            }
+          },
+          "requires_user_interaction": {
+            "type": "boolean"
+          },
+          "input_schema": {
+            "type": "string",
+            "pattern": "^schemas/[a-z_]+\\.input\\.schema\\.json$"
+          },
+          "output_schema": {
+            "type": "string",
+            "pattern": "^(schemas/[a-z_]+\\.output\\.schema\\.json|\\.\\./\\.\\./api/v1/schemas/[a-z]+\\.[a-z_]+\\.response\\.schema\\.json|\\.\\./\\.\\./cli/v1/schemas/[a-z]+\\.output\\.schema\\.json)$"
+          }
+        }
+      }
+    }
+  }
+}

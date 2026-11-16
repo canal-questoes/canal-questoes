@@ -1,0 +1,63 @@
+# Lista positiva da exportação pública e do pacote de implantação.
+#
+# Formato: um padrão de caminho por linha, relativo à raiz do repositório, com "/"; casado por `fnmatch` (o "*"
+# cruza "/", então "dir/**" leva tudo abaixo de "dir/"); linhas vazias e as que começam com "#" são ignoradas.
+# Sem negação: o que não deve sair fica de fora por omissão.
+#
+# Nunca entram: as pastas privadas de documentação (a de execução do loop, a base de conhecimento, a monografia e a
+# arquitetura), as especificações das fatias, os experimentos, as configurações do agente e do processo e o .env
+# (conferido por tests/contract/test_export_lists.py). Também ficam de fora, por omissão: os scripts do loop
+# (scripts/run-codex-*.sh, scripts/make-review-prompt.py, scripts/loop-cost.py), as versões privadas de AGENTS.md,
+# CLAUDE.md e ROADMAP.md da raiz (a exportação põe na raiz as versões públicas de ops/export/publico/) e o .mailmap.
+
+# Código, contratos e testes
+server/**
+client/**
+engine/**
+contracts/**
+tests/**
+
+# Scripts (um por um: os do loop ficam de fora por omissão)
+scripts/check-frozen-engine-tests.sh
+scripts/check-frozen-tests.sh
+scripts/compare_collection.py
+scripts/fetch_age.py
+scripts/run-engine-suite.sh
+scripts/run-suite-triage.py
+scripts/run-suite.sh
+scripts/test-postgres.sh
+
+# Operação, plugin e CI (os workflows vão porque o CI do repositório público precisa deles)
+ops/**
+plugins/**
+docs/operacao/**
+.github/workflows/**
+.github/ISSUE_TEMPLATE/**
+.github/pull_request_template.md
+.github/dependabot.yml
+
+# Documentação pública
+docs/README.md
+docs/tutorial/**
+docs/referencia/**
+docs/explicacao/**
+docs/diagramas/**
+
+# Arquivos da raiz
+README.md
+CONTRIBUTING.md
+CODE_OF_CONDUCT.md
+SECURITY.md
+SUPPORT.md
+CHANGELOG.md
+CITATION.cff
+compose.yaml
+Dockerfile
+.dockerignore
+.gitignore
+.gitattributes
+.env.example
+pyproject.toml
+uv.lock
+pytest.ini
+LICENSE

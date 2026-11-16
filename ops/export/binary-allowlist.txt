@@ -1,0 +1,23 @@
+# Binários que a exportação e o pacote levam.
+#
+# Formato: um caminho exato por linha, relativo à raiz do repositório, com "/"; linhas vazias e as que começam com
+# "#" são ignoradas. Binário = NUL nos primeiros 8 KiB ou UTF-8 inválido (a regra da varredura). Conferido por
+# tests/contract/test_export_lists.py: cada entrada é um arquivo rastreado e binário.
+
+# Imagens das questões de teste do motor
+engine/test/fixtures/courses/cq-test-course/clientFilesCourse/sub/fig.png
+engine/test/fixtures/courses/cq-test-course/clientFilesCourse/x.png
+engine/test/fixtures/courses/cq-test-course/questions/supported/ir-course-media/clientFilesQuestion/x.png
+engine/test/fixtures/courses/cq-test-course/questions/supported/ir-media-escape/fora.png
+engine/test/fixtures/courses/cq-test-course/questions/supported/ir-media-extra/clientFilesQuestion/explicacao.png
+engine/test/fixtures/courses/cq-test-course/questions/supported/ir-media-extra/clientFilesQuestion/figura dois.png
+engine/test/fixtures/courses/cq-test-course/questions/supported/ir-media-subdir/clientFilesQuestion/fig.png
+engine/test/fixtures/courses/cq-test-course/questions/supported/ir-media-subdir/clientFilesQuestion/sub/fig.png
+engine/test/fixtures/courses/cq-test-course/questions/supported/ir-media-types/clientFilesQuestion/foto.jpg
+engine/test/fixtures/courses/cq-test-course/questions/supported/media/clientFilesQuestion/figura.png
+engine/test/fixtures/courses/cq-test-course/questions/supported/option-images/clientFilesQuestion/a.png
+engine/test/fixtures/courses/cq-test-course/questions/supported/option-images/clientFilesQuestion/b.png
+engine/test/fixtures/courses/cq-test-course/questions/supported/option-images/clientFilesQuestion/c.png
+
+# Imagem do repositório de questões de fixture dos testes do servidor
+tests/fixtures/repos/course/questions/with_media/clientFilesQuestion/figura.png

@@ -1,0 +1,45 @@
+# Dependabot: propõe, toda semana, as atualizações das dependências do projeto.
+#
+# - `uv` na raiz: o workspace Python (o `pyproject.toml` e o `uv.lock` da raiz);
+# - `npm` em `/engine`: o `package.json` do motor (hoje sem dependências; a entrada fica pronta para quando houver);
+# - `github-actions` na raiz: as ações dos workflows em `.github/workflows`, fixadas pelo SHA;
+# - `docker` na raiz: a imagem base do `Dockerfile` da raiz;
+# - `docker` em `/engine`: o `Dockerfile` do motor, com a imagem do PrairieLearn no `ignore`: ela fica fixada pelo commit
+#   e pelo digest de propósito, para o motor corrigir exatamente como a versão conferida do PrairieLearn (a troca é uma
+#   decisão manual). Hoje é a única imagem desse arquivo; a entrada fica pronta para outras;
+# - `docker-compose` na raiz: as imagens do `compose.yaml`.
+#
+# As imagens usadas só nos testes (em `engine/test` e em `tests/system`) ficam de fora.
+version: 2
+updates:
+  - package-ecosystem: uv
+    directory: /
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: npm
+    directory: /engine
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: docker
+    directory: /engine
+    schedule:
+      interval: weekly
+    ignore:
+      - dependency-name: "prairielearn/prairielearn"
+
+  - package-ecosystem: docker-compose
+    directory: /
+    schedule:
+      interval: weekly

@@ -1,0 +1,42 @@
+# Segredos e configuração local (nenhum segredo no repositório)
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets/
+
+# Dados e backups (dados pessoais de alunos nunca entram no git)
+*.dump
+*.sql.gz
+backups/
+data/
+*.csv
+!docs/**/*.csv
+!tests/**/fixtures/**/*.csv
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage*
+coverage.xml
+htmlcov/
+
+# Node / TypeScript (engine)
+node_modules/
+dist/
+
+# Execuções de workflow do spec-kit (estado local)
+.specify/workflows/runs/
+
+# Sistema
+.DS_Store
+Thumbs.db
+*.egg-info/
+
+# Relatórios da suíte de conformidade do engine (gerados)
+engine/conformance/resultados/

@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "code",
+    "course",
+    "term",
+    "timezone"
+  ],
+  "properties": {
+    "code": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 40,
+      "pattern": "^[a-z0-9][a-z0-9-]{2,39}$"
+    },
+    "course": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "term": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 40
+    },
+    "timezone": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64
+    },
+    "response_window_minutes": {
+      "type": "integer",
+      "minimum": 5,
+      "maximum": 43200
+    },
+    "free_messages": {
+      "type": "boolean"
+    }
+  }
+}

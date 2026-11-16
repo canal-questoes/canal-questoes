@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://canal-questoes.invalid/contracts/api/v1/schemas/tokens.create.request.schema.json",
+  "title": "POST /v1/tokens — pedido",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "label",
+    "permissions"
+  ],
+  "properties": {
+    "label": {
+      "type": "string"
+    },
+    "permissions": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

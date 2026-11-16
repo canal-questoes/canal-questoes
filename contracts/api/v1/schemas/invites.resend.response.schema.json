@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://canal-questoes.invalid/contracts/api/v1/schemas/invites.resend.response.schema.json",
+  "title": "POST /v1/offerings/{ref}/invites/resend — 200",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "offering",
+    "queued",
+    "valid_hours",
+    "not_students",
+    "not_found_count"
+  ],
+  "properties": {
+    "offering": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "offering_id",
+        "code"
+      ],
+      "properties": {
+        "offering_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "code": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]{2,39}$"
+        }
+      }
+    },
+    "queued": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "valid_hours": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 720
+    },
+    "not_students": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "pseudo_id",
+          "alias"
+        ],
+        "properties": {
+          "pseudo_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "alias": {
+            "type": "string",
+            "pattern": "^(?=[0-9a-f]*[a-f])[0-9a-f]{4,32}$"
+          }
+        }
+      }
+    },
+    "not_found_count": {
+      "type": "integer",
+      "minimum": 0
+    }
+  }
+}

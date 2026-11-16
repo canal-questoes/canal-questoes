@@ -1,0 +1,30 @@
+# Camadas dentro do container engine — reuso do PL no nível 2
+direction: down
+
+classes: {
+  nosso: {style.fill: "#EEEDFE"; style.stroke: "#534AB7"}
+  pl: {style.fill: "#E1F5EE"; style.stroke: "#0F6E56"}
+  autor: {style.fill: "#F1EFE8"; style.stroke: "#5F5E5A"}
+}
+
+worker: "worker" {class: nosso}
+
+engine: "container engine · imagem prairielearn/prairielearn:<hash>" {
+  orquestrador: "Orquestrador (TypeScript, nosso)\nmapa de elementos, fases, score, IR" {class: nosso}
+  reuso: {
+    label: "Peças Node do PL reutilizadas\nmustache · markdown.processQuestion\nCodeCallerNative · esquemas do info.json"
+    class: pl
+  }
+  zygote: "zygote.py (PL)\nfork limpo por uso, seed" {class: pl}
+  elementos: "Elementos PL\npl-number-input etc." {class: pl}
+  lib: "Biblioteca prairielearn\n(Python)" {class: pl}
+  server: "server.py da questão\n(repo, somente leitura)" {class: autor}
+
+  orquestrador -> reuso
+  reuso -> zygote: "JSON por pipe\n(fronteira de processo)"
+  zygote -> elementos
+  zygote -> lib
+  zygote -> server
+}
+
+worker -> engine.orquestrador: "inspecionar · criar variante · corrigir (HTTP)"

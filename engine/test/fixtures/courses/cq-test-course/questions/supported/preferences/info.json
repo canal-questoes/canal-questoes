@@ -1,0 +1,20 @@
+{
+  "uuid": "eb5a9898-5985-4eda-87dc-35301b9e1e67",
+  "title": "Preferências da questão",
+  "topic": "Teste",
+  "type": "v3",
+  "preferences": {
+    "n": {
+      "type": "number",
+      "default": 2
+    },
+    "cor": {
+      "type": "string",
+      "enum": [
+        "azul",
+        "verde"
+      ],
+      "default": "azul"
+    }
+  }
+}

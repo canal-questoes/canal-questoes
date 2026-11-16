@@ -1,0 +1,93 @@
+name: Relatar um defeito
+description: Algo não funciona como a documentação diz. Bug reports in English are welcome.
+title: "[Defeito]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Obrigado por relatar! Antes de enviar:
+
+        - procure nas issues abertas e fechadas se o defeito já foi relatado;
+        - **vulnerabilidade de segurança não vai em issue pública**: siga a política de segurança do repositório
+          (`SECURITY.md`);
+        - **nunca cole** um token, uma senha, o conteúdo do `.env` ou do arquivo de perfil do `cq`, nem dados reais de
+          alunos (nome, RA, e-mail, conta do Telegram); use dados fictícios.
+
+        Relatos em inglês também são aceitos.
+  - type: textarea
+    id: o-que-aconteceu
+    attributes:
+      label: O que aconteceu
+      description: O defeito e a mensagem de erro, se houver.
+    validations:
+      required: true
+  - type: textarea
+    id: o-que-esperava
+    attributes:
+      label: O que você esperava
+    validations:
+      required: true
+  - type: textarea
+    id: como-reproduzir
+    attributes:
+      label: Como reproduzir
+      description: Os passos, com os comandos `cq` que você rodou, de preferência a partir de uma pilha local nova.
+      placeholder: |
+        1.
+        2.
+        3.
+    validations:
+      required: true
+  - type: dropdown
+    id: parte
+    attributes:
+      label: Parte afetada
+      multiple: true
+      options:
+        - CLI (cq)
+        - API
+        - Worker e bots do Telegram
+        - Motor de questões e correção
+        - Servidor MCP e plugin do Claude Code
+        - Pilha local (Docker Compose)
+        - Scripts de operação
+        - Documentação
+        - Outra ou não sei
+    validations:
+      required: true
+  - type: input
+    id: versao
+    attributes:
+      label: Versão ou commit
+      description: >-
+        A tag (por exemplo, v0.1.0) ou o hash do commit. Com a pilha no ar, `cq health` mostra a versão da API.
+    validations:
+      required: true
+  - type: dropdown
+    id: sistema
+    attributes:
+      label: Sistema
+      options:
+        - Linux
+        - Windows com WSL 2
+        - Outro
+    validations:
+      required: true
+  - type: textarea
+    id: diagnostico
+    attributes:
+      label: Diagnóstico
+      description: >-
+        A saída de `cq doctor` e, se ajudar, as linhas de `cq logs --tail 100`. Os registros já saem limpos, mas revise
+        antes de colar.
+      render: text
+  - type: checkboxes
+    id: confirmacoes
+    attributes:
+      label: Confirmações
+      options:
+        - label: Procurei nas issues e não achei um relato igual.
+          required: true
+        - label: Este relato não traz segredo nem dado pessoal real.
+          required: true

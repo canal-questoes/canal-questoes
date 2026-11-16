@@ -1,0 +1,29 @@
+# Estados de uma entrega individual — aluno × disparo
+# Inclui a falha da questão e o "não sei" dado depois do fechamento da janela.
+direction: down
+
+classes: {
+  andamento: {style.fill: "#F1EFE8"; style.stroke: "#5F5E5A"}
+  participou: {style.fill: "#E1F5EE"; style.stroke: "#0F6E56"}
+  ausente: {style.fill: "#FAECE7"; style.stroke: "#993C1D"}
+}
+
+pendente: "pendente\naguarda a variante e o envio" {class: andamento}
+entregue: "entregue\naguarda a resposta; erro de formato pede reenvio" {class: andamento}
+nao_entregue: "não entregue\naluno bloqueou o bot, canal ou motor indisponível" {class: ausente}
+falha: "falha da questão\na questão falhou ao gerar a variante,\nao caber no canal ou ao corrigir" {class: ausente}
+respondida: "respondida\ncorrigida, com feedback direto" {class: participou}
+nao_sei: "não sei\nencerra a entrega" {class: participou}
+sem_resposta: "sem resposta\njanela fechada" {class: ausente}
+atrasada: "respondida com atraso\nconta na métrica com atrasadas" {class: participou}
+
+pendente -> entregue
+pendente -> nao_entregue
+pendente -> falha
+entregue -> respondida
+entregue -> nao_sei
+entregue -> sem_resposta: "fechamento"
+sem_resposta -> atrasada: "resposta após o prazo"
+sem_resposta -> nao_sei: "não sei após o prazo"
+entregue -> falha: "correção quebrada"
+sem_resposta -> falha: "correção quebrada"

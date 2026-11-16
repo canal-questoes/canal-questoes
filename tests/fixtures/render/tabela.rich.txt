@@ -1,0 +1,1 @@
+<table><tr><th>Grandeza</th><th>Valor</th></tr><tr><td>Massa</td><td>2 kg</td></tr><tr><td colspan="2">a &lt; b</td></tr></table>

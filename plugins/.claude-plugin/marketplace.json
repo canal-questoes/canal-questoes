@@ -1,0 +1,13 @@
+{
+  "name": "canal-questoes-local",
+  "owner": {
+    "name": "canal-questoes"
+  },
+  "description": "Marketplace local do canal-questoes: o plugin que opera o sistema pelo agente.",
+  "plugins": [
+    {
+      "name": "canal-questoes",
+      "source": "./canal-questoes"
+    }
+  ]
+}

@@ -1,0 +1,251 @@
+# Ambiente do canal-questoes: as variáveis do Compose e os serviços da pilha.
+#
+# Variáveis (ver .env.example):
+# - CQ_DB_PASSWORD (obrigatória): senha do usuário `cq` do Postgres. Sem ela, todo comando do
+#   Compose falha. Use só caracteres seguros em URL, porque ela entra na URL do banco.
+# - CQ_ADMIN_TOKEN (opcional): token inicial de administração, só para a api.
+# - CQ_API_PORT (opcional, padrão 8000): porta da api no host, publicada só em 127.0.0.1.
+# - CQ_MASTER_KEY (opcional): chave-mestra dos tokens dos bots (32 bytes aleatórios em base64url,
+#   sem "="), só para a api e o worker. Sem ela, o registro de bots responde 503 e o worker não
+#   consulta bots.
+# - CQ_SMTP_HOST, CQ_SMTP_PORT, CQ_SMTP_SECURITY, CQ_SMTP_USERNAME, CQ_SMTP_PASSWORD, CQ_SMTP_FROM e
+#   CQ_SMTP_TIMEOUT_SECONDS (opcionais): o canal de e-mail dos convites, só para o worker.
+#   Sem CQ_SMTP_HOST, o e-mail fica desligado e o Compose sobe; a senha é segredo.
+# - Motor de questões e obtenção de repositórios:
+#   - CQ_REPO_ALLOWED_HOSTS (opcional): hosts git permitidos, separados por vírgula (nomes DNS com
+#     ponto, sem porta nem IP). Vazia recusa todo repositório. A api e o worker a recebem.
+#   - CQ_REPO_FETCH_TIMEOUT_SECONDS, CQ_REPO_MAX_BYTES e CQ_REPO_MAX_FILES (opcionais): prazo e tetos da
+#     obtenção, só no worker. CQ_REPOS_ROOT é fixo em /repos (o volume `repos`).
+#   - CQ_ENGINE_TIMEOUT_SECONDS (opcional): prazo de cada chamada ao motor, só no worker. CQ_ENGINE_URL
+#     é fixo (http://engine:8080); a api nunca fala com o motor.
+#   - CQ_TELEGRAM_FORMAT, CQ_TELEGRAM_MAX_BUTTONS, CQ_SEND_CHAT_INTERVAL_SECONDS, CQ_SEND_BOT_PER_SECOND,
+#     CQ_TELEGRAM_PHOTO_MAX_BYTES e CQ_FREE_MESSAGE_REPLY_SECONDS (opcionais): a entrega pelo Telegram,
+#     só no worker.
+#   - CQ_ENGINE_WORKERS (padrão 2), CQ_ENGINE_PIDS_LIMIT (256), CQ_ENGINE_MEM_LIMIT (2g),
+#     CQ_ENGINE_CPUS (2) e CQ_ENGINE_TMP_SIZE (256m) (opcionais): executores e limites do serviço
+#     `engine`. Nenhuma é segredo.
+#   Vazia vale como ausente (o padrão do servidor). Nenhuma delas vai ao .env.example.
+# - Implantação, backup e diagnóstico. Todas opcionais, vazia
+#   vale como ausente (o padrão), nenhuma é segredo e nenhuma vai ao .env.example:
+#   - Só na api: CQ_BACKUP_STATUS_FILE (caminho absoluto do registro do último backup dentro do container, na VM
+#     /run/cq-backup/last-backup.json; vazia = backup não configurado, "aviso" no doctor), CQ_RETENTION_DAYS
+#     (padrão 30), CQ_DOCTOR_BACKUP_WARNING_HOURS (26), CQ_DOCTOR_BACKUP_FAILURE_HOURS (50),
+#     CQ_DOCTOR_MAIL_STALE_HOURS (13) e as demais do doctor, que também chegam pelo Compose:
+#     CQ_DOCTOR_BOT_POLL_SECONDS, CQ_DOCTOR_TASK_OVERDUE_SECONDS e CQ_DOCTOR_CLOCK_SKEW_SECONDS.
+#   - Só no worker: CQ_MAIL_PROBE_INTERVAL_SECONDS (padrão 21600), o intervalo da sonda do e-mail.
+#   - Do host, só na interpolação: CQ_BACKUP_STATUS_DIR, o diretório de estado do backup, montado só leitura em
+#     /run/cq-backup na api (na VM, /var/backups/cq/state). O padrão, ./ops/backup/status-unconfigured, é um
+#     diretório versionado só com um README.md, sem registro. O diretório dos dumps nunca é montado.
+#   - Do cliente (lidas pelo `cq doctor`, no ambiente do usuário de operação, fora do Compose):
+#     CQ_BACKUP_DIR (o diretório dos dumps, para a conferência do disco), CQ_DOCTOR_DISK_WARNING_PERCENT (padrão
+#     20) e CQ_DOCTOR_DISK_FAILURE_PERCENT (padrão 10).
+# - Logs: api, worker e postgres com rotação json-file de 10m x 3; o motor mantém a dele (1m x 2). O postgres
+#   tem 60 s para parar (stop_grace_period; o padrão do Compose é 10 s antes do SIGKILL), porque a atualização
+#   automática pode reiniciar a VM.
+#
+# Motor (engine): o código Python das questões roda no motor, com o mesmo usuário (65534) do Node e dos
+# outros executores. Por isso ele fica só na rede interna `engine` (sem saída e sem
+# acesso ao gateway do host, com `inhibit_ipv4`), sem porta, só leitura, sem capacidades, com limites e
+# com o volume `repos` só para leitura. Exige Docker Engine >= 26.0.0 (ou 25.0.5 / 23.0.11), com a
+# correção da CVE-2024-29018 (DNS de rede interna). Os logs do contêiner do motor são SENSÍVEIS (o
+# código da questão pode escrever neles): têm rotação curta (1 MiB x 2) e não são coletados por nenhuma
+# saída do sistema. Riscos residuais aceitos no TCC:
+# o código de uma questão pode ler o /repos inteiro, o /proc dos pedidos simultâneos (com respostas de
+# outros alunos) e o /tmp comum, e devolver isso pelo enunciado, feedback ou erros de formato. Use só
+# questões de AUTORES CONFIÁVEIS, pela lista CQ_REPO_ALLOWED_HOSTS; questões de autores não confiáveis
+# EXIGEM um usuário separado para o código da questão (trabalho futuro, que exige rever o isolamento
+# do motor).
+#
+# Segredos só por interpolação ${…}, sem valor literal nem padrão. Não rode `docker compose config`:
+# ele imprime os segredos interpolados.
+
+services:
+  postgres:
+    image: postgres:18.6@sha256:86c951e05bf56c93d95d397747fb8820ac76cc3bedb78f43abd83eedbe3666ae
+    environment:
+      POSTGRES_USER: cq
+      POSTGRES_DB: cq
+      POSTGRES_PASSWORD: ${CQ_DB_PASSWORD:?defina CQ_DB_PASSWORD (veja .env.example)}
+    # Sem DETAIL e sem o texto da instrução nos erros, para o log do banco não
+    # registrar valores.
+    command:
+      - postgres
+      - -c
+      - log_error_verbosity=terse
+      - -c
+      - log_min_error_statement=panic
+    volumes:
+      # Postgres 18: o volume vai em /var/lib/postgresql (em .../data o container não sobe).
+      - pgdata:/var/lib/postgresql
+    healthcheck:
+      # Por TCP: pelo socket, o pg_isready responde "aceitando" ainda durante o init.
+      test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-p", "5432", "-U", "cq", "-d", "cq"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 60s
+      start_interval: 1s
+    restart: unless-stopped
+    stop_grace_period: 60s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["cq-server", "serve"]
+    environment:
+      CQ_DATABASE_URL: postgresql://cq:${CQ_DB_PASSWORD:?defina CQ_DB_PASSWORD (veja .env.example)}@postgres:5432/cq
+      CQ_ADMIN_TOKEN: ${CQ_ADMIN_TOKEN:-}
+      CQ_MASTER_KEY: ${CQ_MASTER_KEY:-}
+      # Só a lista de hosts, para validar a referência de questão na entrada.
+      CQ_REPO_ALLOWED_HOSTS: ${CQ_REPO_ALLOWED_HOSTS:-}
+      # O backup, a retenção e o doctor. Vazio = ausente (o padrão).
+      CQ_BACKUP_STATUS_FILE: ${CQ_BACKUP_STATUS_FILE:-}
+      CQ_RETENTION_DAYS: ${CQ_RETENTION_DAYS:-}
+      CQ_DOCTOR_BACKUP_WARNING_HOURS: ${CQ_DOCTOR_BACKUP_WARNING_HOURS:-}
+      CQ_DOCTOR_BACKUP_FAILURE_HOURS: ${CQ_DOCTOR_BACKUP_FAILURE_HOURS:-}
+      CQ_DOCTOR_MAIL_STALE_HOURS: ${CQ_DOCTOR_MAIL_STALE_HOURS:-}
+      CQ_DOCTOR_BOT_POLL_SECONDS: ${CQ_DOCTOR_BOT_POLL_SECONDS:-}
+      CQ_DOCTOR_TASK_OVERDUE_SECONDS: ${CQ_DOCTOR_TASK_OVERDUE_SECONDS:-}
+      CQ_DOCTOR_CLOCK_SKEW_SECONDS: ${CQ_DOCTOR_CLOCK_SKEW_SECONDS:-}
+    volumes:
+      # Só o diretório de estado do backup, só leitura; nunca o dos dumps.
+      - ${CQ_BACKUP_STATUS_DIR:-./ops/backup/status-unconfigured}:/run/cq-backup:ro
+    ports:
+      - "127.0.0.1:${CQ_API_PORT:-8000}:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import sys, urllib.request; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3).status == 200 else 1)"
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+      start_interval: 1s
+    restart: unless-stopped
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["cq-server", "worker"]
+    environment:
+      CQ_DATABASE_URL: postgresql://cq:${CQ_DB_PASSWORD:?defina CQ_DB_PASSWORD (veja .env.example)}@postgres:5432/cq
+      # O canal de console escreve num arquivo do container, fora do stdout dos logs técnicos.
+      CQ_CONSOLE_OUTPUT: /tmp/console.jsonl
+      CQ_MASTER_KEY: ${CQ_MASTER_KEY:-}
+      # E-mail dos convites: vazio = ausente.
+      CQ_SMTP_HOST: ${CQ_SMTP_HOST:-}
+      CQ_SMTP_PORT: ${CQ_SMTP_PORT:-}
+      CQ_SMTP_SECURITY: ${CQ_SMTP_SECURITY:-}
+      CQ_SMTP_USERNAME: ${CQ_SMTP_USERNAME:-}
+      CQ_SMTP_PASSWORD: ${CQ_SMTP_PASSWORD:-}
+      CQ_SMTP_FROM: ${CQ_SMTP_FROM:-}
+      CQ_SMTP_TIMEOUT_SECONDS: ${CQ_SMTP_TIMEOUT_SECONDS:-}
+      # O motor, a obtenção e a entrega. Vazio = ausente (o padrão).
+      CQ_ENGINE_URL: http://engine:8080
+      CQ_ENGINE_TIMEOUT_SECONDS: ${CQ_ENGINE_TIMEOUT_SECONDS:-}
+      CQ_REPOS_ROOT: /repos
+      CQ_REPO_ALLOWED_HOSTS: ${CQ_REPO_ALLOWED_HOSTS:-}
+      CQ_REPO_FETCH_TIMEOUT_SECONDS: ${CQ_REPO_FETCH_TIMEOUT_SECONDS:-}
+      CQ_REPO_MAX_BYTES: ${CQ_REPO_MAX_BYTES:-}
+      CQ_REPO_MAX_FILES: ${CQ_REPO_MAX_FILES:-}
+      CQ_TELEGRAM_FORMAT: ${CQ_TELEGRAM_FORMAT:-}
+      CQ_TELEGRAM_MAX_BUTTONS: ${CQ_TELEGRAM_MAX_BUTTONS:-}
+      CQ_SEND_CHAT_INTERVAL_SECONDS: ${CQ_SEND_CHAT_INTERVAL_SECONDS:-}
+      CQ_SEND_BOT_PER_SECOND: ${CQ_SEND_BOT_PER_SECOND:-}
+      CQ_TELEGRAM_PHOTO_MAX_BYTES: ${CQ_TELEGRAM_PHOTO_MAX_BYTES:-}
+      CQ_FREE_MESSAGE_REPLY_SECONDS: ${CQ_FREE_MESSAGE_REPLY_SECONDS:-}
+      # O intervalo da sonda do e-mail. Vazio = ausente (o padrão).
+      CQ_MAIL_PROBE_INTERVAL_SECONDS: ${CQ_MAIL_PROBE_INTERVAL_SECONDS:-}
+    # A `default` (banco, Telegram, SMTP e git) e a rede interna do motor. Sem `depends_on` do
+    # motor: motor fora do ar é falha repetível.
+    networks: [default, engine]
+    volumes:
+      # O worker é o único que escreve no volume.
+      - repos:/repos
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Motor de questões. Construído de
+  # engine/Dockerfile (a base do PL fixada por digest). Só na rede interna `engine`; nada de ports,
+  # expose, network_mode, env_file, segredos ou outra chave fora da lista do teste de contrato
+  # (tests/contract/test_engine_isolation.py). Os logs são sensíveis (ver o cabeçalho).
+  engine:
+    build:
+      context: .
+      dockerfile: engine/Dockerfile
+    environment:
+      ENGINE_WORKERS: ${CQ_ENGINE_WORKERS:-2}
+    networks: [engine]
+    read_only: true
+    tmpfs:
+      - /tmp:size=${CQ_ENGINE_TMP_SIZE:-256m},mode=1777
+    user: "65534:65534"
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    pids_limit: ${CQ_ENGINE_PIDS_LIMIT:-256}
+    mem_limit: ${CQ_ENGINE_MEM_LIMIT:-2g}
+    cpus: ${CQ_ENGINE_CPUS:-2}
+    volumes:
+      # Só leitura e `nocopy`: o /repos (root) da imagem do motor nunca vira a cópia inicial do volume, que
+      # fica com o dono 999 da imagem do servidor.
+      - type: volume
+        source: repos
+        target: /repos
+        read_only: true
+        volume:
+          nocopy: true
+    logging:
+      driver: json-file
+      options:
+        max-size: "1m"
+        max-file: "2"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "--show-error", "--max-time", "4", "--output", "/dev/null",
+             "http://127.0.0.1:8080/v1/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+      start_interval: 1s
+    restart: unless-stopped
+
+networks:
+  # A rede do motor: `internal` tira a rota de saída, e `inhibit_ipv4` tira o
+  # endereço do host na ponte (sem ele, o gateway da rede interna alcança os serviços do host).
+  engine:
+    internal: true
+    driver: bridge
+    driver_opts:
+      com.docker.network.bridge.inhibit_ipv4: "true"
+
+volumes:
+  pgdata:
+  repos:

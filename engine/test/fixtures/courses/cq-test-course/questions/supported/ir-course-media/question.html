@@ -1,0 +1,11 @@
+<pl-question-panel>
+  <p>Mesmo nome de arquivo em dois diretórios.</p>
+  <pl-figure file-name="x.png" alt="Questão"></pl-figure>
+  <pl-figure file-name="x.png" directory="clientFilesCourse" alt="Curso"></pl-figure>
+  <p><img src="{{options.client_files_course_url}}/x.png" alt="Curso"></p>
+</pl-question-panel>
+
+<pl-multiple-choice answers-name="mc" order="fixed">
+  <pl-answer correct="true"><pl-figure file-name="x.png" directory="clientFilesCourse" alt="Curso"></pl-figure></pl-answer>
+  <pl-answer><pl-figure file-name="x.png" alt="Questão"></pl-figure></pl-answer>
+</pl-multiple-choice>

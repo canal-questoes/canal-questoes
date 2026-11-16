@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://canal-questoes.invalid/contracts/api/v1/schemas/students.import.request.schema.json",
+  "title": "POST /v1/offerings/{ref}/students — pedido",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "rows"
+  ],
+  "properties": {
+    "rows": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "ra",
+          "email"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "x-identity": "name"
+          },
+          "ra": {
+            "type": "string",
+            "x-identity": "ra"
+          },
+          "email": {
+            "type": "string",
+            "x-identity": "email"
+          }
+        }
+      },
+      "minItems": 1,
+      "maxItems": 1000
+    }
+  }
+}

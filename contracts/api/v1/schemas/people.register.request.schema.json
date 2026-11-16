@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://canal-questoes.invalid/contracts/api/v1/schemas/people.register.request.schema.json",
+  "title": "POST /v1/people — pedido",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "name"
+  ],
+  "properties": {
+    "name": {
+      "type": "string",
+      "x-identity": "name"
+    },
+    "ra": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "x-identity": "ra"
+    },
+    "email": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "x-identity": "email"
+    }
+  }
+}

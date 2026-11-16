@@ -1,0 +1,676 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://canal-questoes/contracts/engine/v1/ir.schema.json",
+  "title": "IR da questão (motor → canal), versão 1.0",
+  "description": "Representação intermediária de uma variante de questão, neutra de canal. O HTML de statement, label_html, suffix_html, option.html, display_html e explanation.html pertence ao subconjunto canônico de HTML que o motor produz.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "ir_version",
+    "statement",
+    "fields",
+    "answer_key",
+    "explanation",
+    "media"
+  ],
+  "properties": {
+    "ir_version": {
+      "const": "1.0"
+    },
+    "statement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "html"
+      ],
+      "properties": {
+        "html": {
+          "type": "string",
+          "description": "Enunciado em HTML canônico. Cada campo de resposta aparece como <cq-field name=\"…\"></cq-field>."
+        }
+      }
+    },
+    "fields": {
+      "type": "array",
+      "minItems": 1,
+      "description": "Campos de resposta na ordem do documento.",
+      "items": {
+        "$ref": "#/$defs/field"
+      }
+    },
+    "answer_key": {
+      "type": "array",
+      "description": "Gabarito, um item por campo, na mesma ordem de fields.",
+      "items": {
+        "$ref": "#/$defs/answer_key_entry"
+      }
+    },
+    "explanation": {
+      "description": "Conteúdo do painel de resposta da questão (pl-answer-panel), se houver.",
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "html",
+            "can_show"
+          ],
+          "properties": {
+            "html": {
+              "type": "string"
+            },
+            "can_show": {
+              "type": "boolean"
+            }
+          }
+        }
+      ]
+    },
+    "media": {
+      "type": "array",
+      "description": "Mídias referenciadas pelo HTML (src=\"cq-media:<id>\"), em ordem de primeira aparição.",
+      "items": {
+        "$ref": "#/$defs/media"
+      }
+    }
+  },
+  "$defs": {
+    "answers_name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200,
+      "pattern": "^[^\\s\"<>&]+$"
+    },
+    "field": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "type",
+        "label_html",
+        "suffix_html",
+        "format",
+        "hint",
+        "constraints",
+        "weight",
+        "options"
+      ],
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/answers_name"
+        },
+        "type": {
+          "enum": [
+            "number",
+            "integer",
+            "text",
+            "single_choice",
+            "multiple_choice"
+          ]
+        },
+        "label_html": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "suffix_html": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "format": {
+          "$ref": "#/$defs/format"
+        },
+        "hint": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "constraints": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "allow_blank"
+          ],
+          "properties": {
+            "allow_blank": {
+              "type": "boolean"
+            },
+            "min_select": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "max_select": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        },
+        "weight": {
+          "type": "number",
+          "minimum": 0
+        },
+        "options": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "$ref": "#/$defs/option"
+              }
+            }
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "enum": [
+                  "single_choice",
+                  "multiple_choice"
+                ]
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "type": "object",
+            "properties": {
+              "options": {
+                "type": "array"
+              }
+            }
+          },
+          "else": {
+            "type": "object",
+            "properties": {
+              "options": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "const": "multiple_choice"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "type": "object",
+            "properties": {
+              "constraints": {
+                "type": "object",
+                "required": [
+                  "allow_blank",
+                  "min_select",
+                  "max_select"
+                ],
+                "properties": {
+                  "allow_blank": {
+                    "type": "boolean"
+                  },
+                  "min_select": {
+                    "type": "integer"
+                  },
+                  "max_select": {
+                    "type": "integer"
+                  }
+                }
+              }
+            }
+          },
+          "else": {
+            "type": "object",
+            "properties": {
+              "constraints": {
+                "type": "object",
+                "properties": {
+                  "min_select": false,
+                  "max_select": false
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "const": "number"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "type": "object",
+            "properties": {
+              "format": {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "const": "number"
+                  }
+                },
+                "required": [
+                  "kind"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "const": "integer"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "type": "object",
+            "properties": {
+              "format": {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "const": "integer"
+                  }
+                },
+                "required": [
+                  "kind"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "const": "text"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "type": "object",
+            "properties": {
+              "format": {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "const": "text"
+                  }
+                },
+                "required": [
+                  "kind"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "const": "single_choice"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "type": "object",
+            "properties": {
+              "format": {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "const": "single_choice"
+                  }
+                },
+                "required": [
+                  "kind"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "const": "multiple_choice"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "type": "object",
+            "properties": {
+              "format": {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "const": "multiple_choice"
+                  }
+                },
+                "required": [
+                  "kind"
+                ]
+              }
+            }
+          }
+        }
+      ]
+    },
+    "format": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "comparison",
+            "allow_fractions",
+            "allow_complex"
+          ],
+          "properties": {
+            "kind": {
+              "const": "number"
+            },
+            "comparison": {
+              "enum": [
+                "relabs",
+                "sigfig",
+                "decdig"
+              ]
+            },
+            "rtol": {
+              "type": "number"
+            },
+            "atol": {
+              "type": "number"
+            },
+            "digits": {
+              "type": "integer"
+            },
+            "allow_fractions": {
+              "type": "boolean"
+            },
+            "allow_complex": {
+              "type": "boolean"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "base"
+          ],
+          "properties": {
+            "kind": {
+              "const": "integer"
+            },
+            "base": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 36
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "ignore_case",
+            "remove_spaces",
+            "remove_leading_trailing",
+            "normalize_to_ascii",
+            "multiline",
+            "regex"
+          ],
+          "properties": {
+            "kind": {
+              "const": "text"
+            },
+            "ignore_case": {
+              "type": "boolean"
+            },
+            "remove_spaces": {
+              "type": "boolean"
+            },
+            "remove_leading_trailing": {
+              "type": "boolean"
+            },
+            "normalize_to_ascii": {
+              "type": "boolean"
+            },
+            "multiline": {
+              "type": "boolean"
+            },
+            "regex": {
+              "type": "boolean"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "const": "single_choice"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "partial_credit"
+          ],
+          "properties": {
+            "kind": {
+              "const": "multiple_choice"
+            },
+            "partial_credit": {
+              "enum": [
+                "off",
+                "net-correct",
+                "coverage",
+                "each-answer"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "option": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "key",
+        "html",
+        "content_hash"
+      ],
+      "properties": {
+        "key": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 16,
+          "pattern": "^[A-Za-z0-9]+$"
+        },
+        "html": {
+          "type": "string"
+        },
+        "content_hash": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "description": "sha256 do html canônico da opção, com cada src=\"cq-media:mN\" trocado pela identidade estável da mídia (cq-media:<origin>:<filename>) e espaços colapsados."
+        }
+      }
+    },
+    "answer_key_entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "can_show",
+        "correct_value",
+        "display_html"
+      ],
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/answers_name"
+        },
+        "can_show": {
+          "type": "boolean"
+        },
+        "correct_value": {
+          "description": "Valor de correct_answers[name], como o PL o guarda, ou null se ausente."
+        },
+        "display_html": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "media": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "origin",
+        "filename",
+        "content_type",
+        "alt",
+        "status"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^m[0-9]+$"
+        },
+        "origin": {
+          "enum": [
+            "static",
+            "dynamic"
+          ]
+        },
+        "filename": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Estática: <diretório-base>/<caminho>, com diretório-base clientFilesQuestion (da questão) ou clientFilesCourse (do curso); ex.: clientFilesQuestion/figura.png. Gerada: o nome passado ao file() da questão."
+        },
+        "content_type": {
+          "type": "string",
+          "pattern": "^[a-z]+/[A-Za-z0-9.+-]+$"
+        },
+        "alt": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "status": {
+          "enum": [
+            "ok",
+            "missing"
+          ]
+        },
+        "data_base64": {
+          "type": "string",
+          "contentEncoding": "base64"
+        },
+        "size_bytes": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "if": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "const": "ok"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "type": "object",
+        "required": [
+          "data_base64",
+          "size_bytes"
+        ],
+        "properties": {
+          "data_base64": {
+            "type": "string"
+          },
+          "size_bytes": {
+            "type": "integer"
+          }
+        }
+      },
+      "else": {
+        "type": "object",
+        "not": {
+          "type": "object",
+          "required": [
+            "data_base64"
+          ],
+          "properties": {
+            "data_base64": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    }
+  }
+}

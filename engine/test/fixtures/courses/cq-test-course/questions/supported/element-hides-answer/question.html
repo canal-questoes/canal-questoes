@@ -1,0 +1,22 @@
+<pl-question-panel>
+  <p>Campos cujo gabarito o PL não mostra.</p>
+  <pl-integer-input answers-name="dentro"></pl-integer-input>
+</pl-question-panel>
+
+<pl-number-input answers-name="num" show-correct-answer="false"></pl-number-input>
+
+<pl-checkbox answers-name="cb" hide-answer-panel="true">
+  <pl-answer correct="true">Certa</pl-answer>
+  <pl-answer>Errada</pl-answer>
+</pl-checkbox>
+
+<pl-hide-in-panel answer="true">
+  <pl-string-input answers-name="txt"></pl-string-input>
+</pl-hide-in-panel>
+
+<pl-multiple-choice answers-name="mc" builtin-grading="false">
+  <pl-answer correct="true">Sim</pl-answer>
+  <pl-answer>Não</pl-answer>
+</pl-multiple-choice>
+
+<pl-integer-input answers-name="visivel"></pl-integer-input>

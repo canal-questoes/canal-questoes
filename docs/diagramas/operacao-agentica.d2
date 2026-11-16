@@ -1,0 +1,29 @@
+# Operação por pessoas e por agente
+direction: down
+
+classes: {
+  pessoa: {shape: person; style.fill: "#E1F5EE"; style.stroke: "#0F6E56"}
+  agente: {style.fill: "#F1EFE8"; style.stroke: "#5F5E5A"}
+  nosso: {style.fill: "#EEEDFE"; style.stroke: "#534AB7"}
+}
+
+professor: Professor {class: pessoa}
+claude: "Claude Code (agente)" {class: agente}
+skills: "Skills do plugin\nprocedimentos e cuidados" {class: nosso}
+
+pacote: "pacote cliente (Python)" {
+  cli: "CLI\npara pessoas" {class: nosso}
+  mcp: "Servidor MCP (stdio)\nferramentas curadas" {class: nosso}
+  cliente: "Cliente da API\nperfis, auth, pilha local" {class: nosso}
+  cli -> cliente
+  mcp -> cliente
+}
+
+api: "API do sistema\nidentidade só sai pela revelação" {class: nosso}
+pilha: "Pilha local\n(Docker Compose)" {class: agente}
+
+professor -> pacote.cli
+claude -> skills: "lê os procedimentos"
+claude -> pacote.mcp: "chama as ferramentas (stdio)"
+pacote.cliente -> api
+pacote.cliente -> pilha: "sobe, para, estado, registros"

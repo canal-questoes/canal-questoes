@@ -1,0 +1,13 @@
+<pl-question-panel>
+  <p>Figuras da questão.</p>
+  <pl-figure file-name="figura.png" alt="Figura estática"></pl-figure>
+  <pl-figure file-name="gerada.png" type="dynamic" alt="Figura gerada"></pl-figure>
+  <pl-figure file-name="aleatorio.png" type="dynamic"></pl-figure>
+  <pl-figure file-name="falha.png" type="dynamic"></pl-figure>
+  <p><img src="{{options.client_files_question_url}}/ausente.png" alt="Ausente"></p>
+</pl-question-panel>
+
+<pl-multiple-choice answers-name="mc" order="fixed">
+  <pl-answer correct="true">Com figura <pl-figure file-name="figura.png"></pl-figure></pl-answer>
+  <pl-answer>Sem figura</pl-answer>
+</pl-multiple-choice>

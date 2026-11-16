@@ -1,0 +1,114 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://canal-questoes.invalid/contracts/api/v1/catalog.schema.json",
+  "title": "Catálogo único de operações",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "operations"
+  ],
+  "properties": {
+    "version": {
+      "const": "1"
+    },
+    "operations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "method",
+          "path",
+          "permission",
+          "cli",
+          "mcp",
+          "destructive"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z]+\\.[a-z_]+$"
+          },
+          "method": {
+            "enum": [
+              "GET",
+              "POST",
+              "PUT",
+              "PATCH",
+              "DELETE"
+            ]
+          },
+          "path": {
+            "type": "string",
+            "pattern": "^/"
+          },
+          "permission": {
+            "enum": [
+              "bots:manage",
+              "events:read",
+              "identity:reveal",
+              "offerings:read",
+              "offerings:write",
+              "people:read",
+              "people:write",
+              "tokens:manage",
+              null
+            ]
+          },
+          "cli": {
+            "type": "string",
+            "pattern": "^[a-z]+( [a-z]+)*$"
+          },
+          "mcp": {
+            "oneOf": [
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "exposed",
+                  "tool",
+                  "confirm"
+                ],
+                "properties": {
+                  "exposed": {
+                    "const": true
+                  },
+                  "tool": {
+                    "type": "string",
+                    "pattern": "^[a-z_]+$"
+                  },
+                  "confirm": {
+                    "type": "boolean"
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "exposed",
+                  "reason"
+                ],
+                "properties": {
+                  "exposed": {
+                    "const": false
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              }
+            ]
+          },
+          "destructive": {
+            "type": "boolean"
+          }
+        }
+      },
+      "minItems": 1
+    }
+  }
+}

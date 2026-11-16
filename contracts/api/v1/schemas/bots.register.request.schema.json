@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://canal-questoes.invalid/contracts/api/v1/schemas/bots.register.request.schema.json",
+  "title": "PUT /v1/offerings/{ref}/bot — pedido",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "token"
+  ],
+  "properties": {
+    "token": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 80,
+      "pattern": "^[1-9][0-9]{0,15}:[A-Za-z0-9_-]{30,}$",
+      "x-secret": true
+    }
+  }
+}

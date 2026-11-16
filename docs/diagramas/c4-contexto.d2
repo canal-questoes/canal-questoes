@@ -1,0 +1,28 @@
+# C4 nível 1 — contexto
+direction: down
+
+classes: {
+  pessoa: {shape: person; style.fill: "#E1F5EE"; style.stroke: "#0F6E56"}
+  externo: {style.fill: "#F1EFE8"; style.stroke: "#5F5E5A"}
+  futuro: {style.fill: "#F1EFE8"; style.stroke: "#5F5E5A"; style.stroke-dash: 4}
+  sistema: {style.fill: "#EEEDFE"; style.stroke: "#534AB7"}
+}
+
+gestao: "Gestão do banco de questões\n(sistemas externos de gestão de questões)" {class: externo}
+repos: "Repositórios PrairieLearn\n(git)" {class: externo}
+feedback: "Serviço de feedback elaborado\n(futuro)" {class: futuro}
+professor: Professor {class: pessoa}
+sistema: "canal-questoes\n(entrega e correção de questões)" {class: sistema}
+email: "Servidor de e-mail\n(SMTP)" {class: externo}
+telegram: "Telegram\n(1 bot por oferecimento)" {class: externo}
+alunos: Alunos {class: pessoa}
+
+gestao -> sistema: "referências e disparos (API)"
+sistema -> repos: "lê repo@commit"
+feedback -> sistema: "lê os eventos (API)" {style.stroke-dash: 4}
+professor -> sistema: "administra (CLI, agente)"
+sistema -> email: "convites"
+email -> alunos: "link de convite"
+sistema <-> telegram: "Bot API (long polling)"
+telegram <-> alunos: "questões e respostas"
+telegram -> professor: "resumos e notificações"
