@@ -824,6 +824,9 @@ def test_second_loss_of_the_tree_creates_a_round_two_refetch(world: _World) -> N
     dispatch = world.validated(off, "number")
     world.confirm(off, dispatch)
     ref = world.ref_row("number")
+    # As duas entregas saem antes da primeira perda: a preparação da segunda não pode encontrar a árvore apagada.
+    for student in (alice, bruno):
+        world.wait_delivery(dispatch, student, "delivered")
     for n, student in enumerate((alice, bruno), start=1):
         delivery = world.wait_delivery(dispatch, student, "delivered")
         assert world.fetcher.delete_tree(REPO, COMMIT)

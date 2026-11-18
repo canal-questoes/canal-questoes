@@ -1249,6 +1249,10 @@ def test_bot_without_access_until_close_leaves_messages_untouched(
     _start_bots(world, bot_worker_thread)
 
     def queued(opened: Opened) -> bool:
+        # A abertura do disparo corre junto com a perda do acesso: a entrega pode ainda não existir.
+        created = sql.execute("SELECT count(*) FROM deliveries WHERE dispatch_id = %s", (opened.row,)).fetchone()[0]
+        if not created:
+            return False
         delivery = _delivery(world, opened, s1)
         return delivery["variant_at"] is not None and bool(_messages(world, delivery))
 
@@ -1303,7 +1307,13 @@ def test_bot_access_back_before_close_delivers_the_question(
         "SELECT s.id, r.ref_uuid FROM dispatches s JOIN question_refs r ON r.id = s.question_ref_id "
         "WHERE s.dispatch_uuid = %s", (dispatch_id,)).fetchone()
     opened = Opened(dispatch_id=dispatch_id, row=row, closes_at=closes_at, question_ref_id=str(ref_uuid))
-    _wait(lambda: _delivery(world, opened, s1)["variant_at"] is not None, "a variante gravada")
+
+    def variant_recorded() -> bool:
+        # A abertura do disparo corre junto com a perda do acesso: a entrega pode ainda não existir.
+        created = sql.execute("SELECT count(*) FROM deliveries WHERE dispatch_id = %s", (opened.row,)).fetchone()[0]
+        return created > 0 and _delivery(world, opened, s1)["variant_at"] is not None
+
+    _wait(variant_recorded, "a variante gravada")
     assert _delivery(world, opened, s1)["state"] == "pending"
 
     register_bot(client, ADMIN_TOKEN, world.code, rich_bot_api.rotate_token(world.tg_bot))
