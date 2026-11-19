@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://canal-questoes.invalid/contracts/cli/v1/schemas/up.output.schema.json",
+  "title": "cq up --json — saída",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "project",
+    "services",
+    "api_port"
+  ],
+  "properties": {
+    "project": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9_-]*$"
+    },
+    "services": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "service",
+          "state",
+          "health"
+        ],
+        "properties": {
+          "service": {
+            "enum": [
+              "postgres",
+              "api",
+              "worker",
+              "engine"
+            ]
+          },
+          "state": {
+            "enum": [
+              "running",
+              "stopped",
+              "absent",
+              "unknown"
+            ]
+          },
+          "health": {
+            "enum": [
+              "healthy",
+              "unhealthy",
+              "starting",
+              "none",
+              "unknown"
+            ]
+          }
+        }
+      }
+    },
+    "api_port": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 65535
+    }
+  }
+}

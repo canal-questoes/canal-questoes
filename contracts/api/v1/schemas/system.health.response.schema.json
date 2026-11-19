@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://canal-questoes.invalid/contracts/api/v1/schemas/system.health.response.schema.json",
+  "title": "GET /health",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "status",
+    "version",
+    "database",
+    "schema_version",
+    "expected_schema_version"
+  ],
+  "properties": {
+    "status": {
+      "enum": [
+        "ok",
+        "error"
+      ]
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+    },
+    "database": {
+      "enum": [
+        "ok",
+        "unreachable"
+      ]
+    },
+    "schema_version": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[0-9]{4}$"
+    },
+    "expected_schema_version": {
+      "type": "string",
+      "pattern": "^[0-9]{4}$"
+    }
+  }
+}

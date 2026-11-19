@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://canal-questoes.invalid/contracts/api/v1/schemas/offerings.update_settings.request.schema.json",
+  "title": "PATCH /v1/offerings/{ref}/settings — pedido",
+  "type": "object",
+  "additionalProperties": false,
+  "minProperties": 1,
+  "properties": {
+    "free_messages": {
+      "type": "boolean"
+    },
+    "contact_email": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "x-identity": "email"
+    }
+  }
+}

@@ -1,0 +1,9 @@
+Passos:
+
+• Ler a entrada
+• Somar os valores
+  • inteiros
+  • reais
+
+1. Primeiro
+2. Segundo

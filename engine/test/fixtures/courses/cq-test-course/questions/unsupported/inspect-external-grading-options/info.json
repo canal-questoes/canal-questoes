@@ -1,0 +1,10 @@
+{
+  "uuid": "dab43dd0-9e4c-4cd4-9467-cc459d5cade6",
+  "title": "externalGradingOptions sem gradingMethod",
+  "topic": "Teste",
+  "type": "v3",
+  "externalGradingOptions": {
+    "image": "prairielearn/grader-python",
+    "entrypoint": "/python_autograder/run.sh"
+  }
+}

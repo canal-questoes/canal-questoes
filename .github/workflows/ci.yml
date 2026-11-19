@@ -1,0 +1,207 @@
+# CI do canal-questoes.
+#
+# - `fast`: em todo push (todas as branches), em pull request e à mão; a suíte sem os testes de sistema, em paralelo,
+#   por `ops/ci/ci_suite.py fast` (o mesmo passo da validação local, `ops/ci/validate_local.py`).
+# - `full`: na `main` e à mão; `ops/ci/ci_suite.py full` (a rápida e depois os testes de sistema, que constroem o motor
+#   a partir da imagem do PL).
+# - No `fast`, o lint bloqueante (`ruff check`, com a configuração do `pyproject.toml`) antes da suíte; a suíte mede a
+#   cobertura do servidor e do cliente (`--coverage-xml`), o resumo dela vai para o resumo da execução e o
+#   `coverage.xml` vai para o Codecov.
+# - Sem nenhum segredo: o topo só lê o conteúdo; o `fast` pede também `id-token: write`, só para o envio ao Codecov
+#   pela identidade do workflow (OIDC), sem token guardado, pulado nas pull requests vindas de fork. Nenhuma rede
+#   externa além do download das dependências fixadas (pacotes do `uv.lock`, imagens por digest e o age v1.3.2 pelo
+#   SHA-256 fixado) e desse envio.
+# - Ações fixadas pelo SHA do commit da tag, com a versão em comentário (conferido em 2026-10-30).
+#
+# [I] O digest na imagem do serviço Postgres (`nome:tag@sha256:`) não é citado pela documentação do GitHub;
+# a primeira execução real confere (docs/operacao/ci-e-exportacao.md).
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  fast:
+    name: Suíte rápida (sem os testes de sistema)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    # O `id-token: write` serve só ao envio da cobertura ao Codecov pela identidade do workflow (OIDC). A lista dos
+    # passos deste job é fechada (tests/contract/test_public_workflows.py): um passo novo exige mudar o teste.
+    permissions:
+      contents: read
+      id-token: write
+    # O Postgres de serviço fica em 127.0.0.1:55432, o endereço padrão dos testes (tests/conftest.py, o mesmo do
+    # `scripts/test-postgres.sh`); por isso nenhum DSN é passado.
+    services:
+      postgres:
+        # A mesma imagem, com o mesmo digest, do `scripts/test-postgres.sh`.
+        image: postgres:18.6@sha256:86c951e05bf56c93d95d397747fb8820ac76cc3bedb78f43abd83eedbe3666ae
+        env:
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 127.0.0.1:55432:5432
+        options: >-
+          --shm-size=256m
+          --health-cmd "pg_isready -h 127.0.0.1 -p 5432 -U postgres"
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 60
+    steps:
+      - name: Obter o código
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Instalar o uv
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+
+      - name: Usar o cache padrão do uv
+        # O tests/integration/test_client_package.py limpa as variáveis UV_* e procura o cache padrão do uv
+        # ($HOME/.cache/uv); a sincronização e o aquecimento abaixo têm de usar esse mesmo diretório. [I] A ação
+        # setup-uv pode definir outro UV_CACHE_DIR; este passo o sobrepõe para os passos seguintes.
+        run: echo "UV_CACHE_DIR=$HOME/.cache/uv" >> "$GITHUB_ENV"
+
+      - name: Instalar as dependências fixadas
+        run: uv sync --locked
+
+      - name: Lint (bloqueante)
+        # O ruff fixado no grupo `dev`, com a configuração do `pyproject.toml` (E, F e W; linhas de até 120 colunas).
+        run: uv run ruff check server/src client/src ops scripts
+
+      - name: Aquecer o cache do uv para o pacote cliente
+        # O tests/integration/test_client_package.py constrói e instala o cliente sem rede (`--offline`); estes
+        # passos repetem os dele com rede, para deixar no cache o backend de construção e os metadados do índice das
+        # dependências (o `uv sync --locked` não grava os metadados) [I].
+        run: |
+          uv build --wheel --out-dir "$RUNNER_TEMP/uv-warm" client
+          uv export --frozen --no-dev --package cq-client --no-hashes --no-emit-workspace --output-file "$RUNNER_TEMP/uv-warm/req.txt"
+          uv venv --no-project --python python3 "$RUNNER_TEMP/uv-warm/venv"
+          uv pip install --python "$RUNNER_TEMP/uv-warm/venv/bin/python" -r "$RUNNER_TEMP/uv-warm/req.txt" "$RUNNER_TEMP"/uv-warm/cq_client-*.whl
+
+      - name: Ajustar o max_connections do Postgres de serviço
+        # O mesmo `-c max_connections=300` do `scripts/test-postgres.sh`. [I] O serviço do Actions não aceita
+        # argumentos para o comando da imagem; o valor entra pelo `ALTER SYSTEM` e vale depois de reiniciar.
+        run: |
+          pg="${{ job.services.postgres.id }}"
+          docker exec "$pg" psql -U postgres -v ON_ERROR_STOP=1 -c "ALTER SYSTEM SET max_connections = 300"
+          docker restart "$pg" > /dev/null
+          for _ in $(seq 1 60); do
+            if docker exec "$pg" pg_isready -h 127.0.0.1 -p 5432 -U postgres > /dev/null 2>&1; then
+              docker exec "$pg" psql -U postgres -At -c "SHOW max_connections"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "o Postgres de serviço não voltou em 60 s" >&2
+          exit 1
+
+      - name: Obter o age v1.3.2 (Linux)
+        # Os testes do age estão na suíte rápida e falham sem o binário; o SHA-256 é conferido pelo script.
+        run: |
+          uv run python scripts/fetch_age.py --platform linux-amd64 --dest "$RUNNER_TEMP/age"
+          echo "CQ_TEST_AGE_DIR=$RUNNER_TEMP/age" >> "$GITHUB_ENV"
+
+      - name: Rodar a suíte rápida, com a cobertura
+        run: uv run python ops/ci/ci_suite.py fast --coverage-xml coverage.xml
+
+      - name: Resumo da cobertura
+        # Também quando a suíte falha, desde que o XML exista (a cobertura de uma suíte vermelha ainda informa).
+        if: ${{ !cancelled() && hashFiles('coverage.xml') != '' }}
+        run: |
+          uv run coverage report --format=markdown >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo ""
+            echo "Escopo: servidor e cliente, medidos no processo do pytest e nos subprocessos que herdam o ambiente."
+            echo "Ressalva: a cobertura fica subestimada: os subprocessos com ambiente explícito ficam fora."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Enviar a cobertura ao Codecov
+        # Pela identidade do workflow (OIDC), sem token, e pulado nas pull requests vindas de fork. Uma falha do envio
+        # não derruba o CI.
+        if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
+        with:
+          use_oidc: true
+          files: coverage.xml
+          disable_search: true
+          fail_ci_if_error: false
+
+  full:
+    name: Suíte inteira (com os testes de sistema)
+    if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    services:
+      postgres:
+        image: postgres:18.6@sha256:86c951e05bf56c93d95d397747fb8820ac76cc3bedb78f43abd83eedbe3666ae
+        env:
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 127.0.0.1:55432:5432
+        options: >-
+          --shm-size=256m
+          --health-cmd "pg_isready -h 127.0.0.1 -p 5432 -U postgres"
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 60
+    steps:
+      - name: Obter o código
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Instalar o uv
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+
+      - name: Usar o cache padrão do uv
+        # O tests/integration/test_client_package.py limpa as variáveis UV_* e procura o cache padrão do uv
+        # ($HOME/.cache/uv); a sincronização e o aquecimento abaixo têm de usar esse mesmo diretório. [I] A ação
+        # setup-uv pode definir outro UV_CACHE_DIR; este passo o sobrepõe para os passos seguintes.
+        run: echo "UV_CACHE_DIR=$HOME/.cache/uv" >> "$GITHUB_ENV"
+
+      - name: Instalar as dependências fixadas
+        run: uv sync --locked
+
+      - name: Aquecer o cache do uv para o pacote cliente
+        # O tests/integration/test_client_package.py constrói e instala o cliente sem rede (`--offline`); estes
+        # passos repetem os dele com rede, para deixar no cache o backend de construção e os metadados do índice das
+        # dependências (o `uv sync --locked` não grava os metadados) [I].
+        run: |
+          uv build --wheel --out-dir "$RUNNER_TEMP/uv-warm" client
+          uv export --frozen --no-dev --package cq-client --no-hashes --no-emit-workspace --output-file "$RUNNER_TEMP/uv-warm/req.txt"
+          uv venv --no-project --python python3 "$RUNNER_TEMP/uv-warm/venv"
+          uv pip install --python "$RUNNER_TEMP/uv-warm/venv/bin/python" -r "$RUNNER_TEMP/uv-warm/req.txt" "$RUNNER_TEMP"/uv-warm/cq_client-*.whl
+
+      - name: Ajustar o max_connections do Postgres de serviço
+        run: |
+          pg="${{ job.services.postgres.id }}"
+          docker exec "$pg" psql -U postgres -v ON_ERROR_STOP=1 -c "ALTER SYSTEM SET max_connections = 300"
+          docker restart "$pg" > /dev/null
+          for _ in $(seq 1 60); do
+            if docker exec "$pg" pg_isready -h 127.0.0.1 -p 5432 -U postgres > /dev/null 2>&1; then
+              docker exec "$pg" psql -U postgres -At -c "SHOW max_connections"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "o Postgres de serviço não voltou em 60 s" >&2
+          exit 1
+
+      - name: Obter o age v1.3.2 (Linux)
+        run: |
+          uv run python scripts/fetch_age.py --platform linux-amd64 --dest "$RUNNER_TEMP/age"
+          echo "CQ_TEST_AGE_DIR=$RUNNER_TEMP/age" >> "$GITHUB_ENV"
+
+      - name: Rodar a suíte inteira
+        # A rápida em paralelo e depois os testes de sistema em série; os de sistema constroem o
+        # motor a partir da imagem do PL fixada no engine/Dockerfile (baixada aqui).
+        run: uv run python ops/ci/ci_suite.py full

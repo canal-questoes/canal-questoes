@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "lines",
+    "returned",
+    "redacted",
+    "omitted",
+    "truncated"
+  ],
+  "properties": {
+    "lines": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "service",
+          "text"
+        ],
+        "properties": {
+          "service": {
+            "enum": [
+              "api",
+              "worker",
+              "postgres"
+            ]
+          },
+          "text": {
+            "type": "string",
+            "x-untrusted": true
+          }
+        }
+      }
+    },
+    "returned": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "redacted": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "omitted": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "truncated": {
+      "type": "boolean"
+    }
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "uuid": "5f0c7a52-2d1e-4b7a-9c3e-000000000000",
+  "name": "CQ-Teste",
+  "title": "Curso de teste do disparo (obtenção falsa e motor falso)",
+  "topics": [
+    {
+      "name": "Teste",
+      "color": "gray1",
+      "description": "Questões de teste do disparo"
+    }
+  ],
+  "tags": [
+    {
+      "name": "teste",
+      "color": "gray1",
+      "description": "Questão de teste"
+    }
+  ]
+}

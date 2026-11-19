@@ -1,0 +1,10 @@
+# Contatos públicos que a varredura da exportação e do pacote aceita no tipo email.
+#
+# Formato: um endereço de e-mail ASCII por linha (local@domínio), na forma que o detector email reconhece; linhas
+# vazias e as que começam com "#" são ignoradas. Sem repetição (comparada sem caixa) e sem domínio reservado: os de
+# example.com/.org/.net e dos seus subdomínios, e os de *.invalid, *.test e *.localhost, já são aceitos.
+#
+# No máximo uma entrada, e cada endereço tem de aparecer num arquivo de contato da árvore pública (README.md,
+# CONTRIBUTING.md, CODE_OF_CONDUCT.md, SECURITY.md, SUPPORT.md ou CITATION.cff). A lista começa vazia; o mantenedor
+# acrescenta o endereço público do projeto quando o escolher. Ausente vale como vazia.
+canal.questoes.ic@gmail.com

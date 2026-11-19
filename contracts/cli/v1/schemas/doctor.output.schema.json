@@ -1,0 +1,197 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://canal-questoes.invalid/contracts/cli/v1/schemas/doctor.output.schema.json",
+  "title": "cq doctor --json — saída",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "profile",
+    "checks"
+  ],
+  "properties": {
+    "profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "kind",
+        "api_url",
+        "token_set",
+        "compose_project",
+        "origins"
+      ],
+      "properties": {
+        "name": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "kind": {
+          "enum": [
+            "local",
+            "remote"
+          ]
+        },
+        "api_url": {
+          "type": "string",
+          "pattern": "^https?://[^/?#@\\s]+([/?#].*)?$"
+        },
+        "token_set": {
+          "type": "boolean"
+        },
+        "compose_project": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-z0-9][a-z0-9_-]*$"
+        },
+        "origins": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "name",
+            "kind",
+            "api_url",
+            "token",
+            "compose_project"
+          ],
+          "properties": {
+            "name": {
+              "enum": [
+                "option",
+                "env",
+                "file",
+                "default"
+              ]
+            },
+            "kind": {
+              "enum": [
+                "profile",
+                "inferred"
+              ]
+            },
+            "api_url": {
+              "enum": [
+                "env",
+                "profile",
+                "file",
+                "default"
+              ]
+            },
+            "token": {
+              "enum": [
+                "env",
+                "profile",
+                "file",
+                "default"
+              ]
+            },
+            "compose_project": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "profile",
+                "default",
+                null
+              ]
+            }
+          }
+        }
+      }
+    },
+    "checks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "part",
+          "result",
+          "message",
+          "offering",
+          "count",
+          "detail"
+        ],
+        "properties": {
+          "id": {
+            "enum": [
+              "api.reachable",
+              "database.reachable",
+              "database.schema",
+              "api.access",
+              "bots.master_key",
+              "bot.access",
+              "bot.poll",
+              "bot.lease",
+              "tasks.overdue",
+              "clock.skew",
+              "backup.age",
+              "smtp.server",
+              "retention.overdue",
+              "docker.reachable",
+              "compose.version",
+              "stack.directory",
+              "stack.env_file",
+              "service.postgres",
+              "service.api",
+              "service.worker",
+              "service.engine",
+              "engine.image",
+              "api.owner",
+              "postgres.volume",
+              "disk.space",
+              "profile.permissions",
+              "profile.git"
+            ]
+          },
+          "part": {
+            "enum": [
+              "api",
+              "local",
+              "profile"
+            ]
+          },
+          "result": {
+            "enum": [
+              "ok",
+              "warning",
+              "failure",
+              "not_verified",
+              "not_applicable"
+            ]
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1
+          },
+          "offering": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[a-z0-9][a-z0-9-]{2,39}$"
+          },
+          "count": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "detail": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      }
+    }
+  }
+}

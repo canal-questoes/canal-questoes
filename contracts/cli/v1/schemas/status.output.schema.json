@@ -1,0 +1,236 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://canal-questoes.invalid/contracts/cli/v1/schemas/status.output.schema.json",
+  "title": "cq status --json — saída",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "profile",
+    "services",
+    "api_port",
+    "api",
+    "warnings"
+  ],
+  "properties": {
+    "profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "kind",
+        "api_url",
+        "token_set",
+        "compose_project",
+        "origins"
+      ],
+      "properties": {
+        "name": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "kind": {
+          "enum": [
+            "local",
+            "remote"
+          ]
+        },
+        "api_url": {
+          "type": "string",
+          "pattern": "^https?://[^/?#@\\s]+([/?#].*)?$"
+        },
+        "token_set": {
+          "type": "boolean"
+        },
+        "compose_project": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-z0-9][a-z0-9_-]*$"
+        },
+        "origins": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "name",
+            "kind",
+            "api_url",
+            "token",
+            "compose_project"
+          ],
+          "properties": {
+            "name": {
+              "enum": [
+                "option",
+                "env",
+                "file",
+                "default"
+              ]
+            },
+            "kind": {
+              "enum": [
+                "profile",
+                "inferred"
+              ]
+            },
+            "api_url": {
+              "enum": [
+                "env",
+                "profile",
+                "file",
+                "default"
+              ]
+            },
+            "token": {
+              "enum": [
+                "env",
+                "profile",
+                "file",
+                "default"
+              ]
+            },
+            "compose_project": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "profile",
+                "default",
+                null
+              ]
+            }
+          }
+        }
+      }
+    },
+    "services": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "service",
+          "state",
+          "health"
+        ],
+        "properties": {
+          "service": {
+            "enum": [
+              "postgres",
+              "api",
+              "worker",
+              "engine"
+            ]
+          },
+          "state": {
+            "enum": [
+              "running",
+              "stopped",
+              "absent",
+              "unknown"
+            ]
+          },
+          "health": {
+            "enum": [
+              "healthy",
+              "unhealthy",
+              "starting",
+              "none",
+              "unknown"
+            ]
+          }
+        }
+      }
+    },
+    "api_port": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 1,
+      "maximum": 65535
+    },
+    "api": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "reachable",
+        "health",
+        "owned_by_stack"
+      ],
+      "properties": {
+        "reachable": {
+          "type": "boolean"
+        },
+        "health": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "version",
+            "database",
+            "schema_version",
+            "expected_schema_version"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "ok",
+                "error"
+              ]
+            },
+            "version": {
+              "type": "string",
+              "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+            },
+            "database": {
+              "enum": [
+                "ok",
+                "unreachable"
+              ]
+            },
+            "schema_version": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "pattern": "^[0-9]{4}$"
+            },
+            "expected_schema_version": {
+              "type": "string",
+              "pattern": "^[0-9]{4}$"
+            }
+          }
+        },
+        "owned_by_stack": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      }
+    },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "foreign_api",
+          "port_mismatch",
+          "docker_unavailable",
+          "insecure_transport",
+          "env_file_missing"
+        ]
+      }
+    }
+  }
+}

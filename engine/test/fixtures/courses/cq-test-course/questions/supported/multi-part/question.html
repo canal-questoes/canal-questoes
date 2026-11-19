@@ -1,0 +1,20 @@
+<pl-question-panel>x = {{params.x}}</pl-question-panel>
+
+<pl-number-input answers-name="num" label="$y =$" suffix="m/s"></pl-number-input>
+
+<pl-integer-input answers-name="int" base="16"></pl-integer-input>
+
+<pl-string-input answers-name="txt" ignore-case="true"></pl-string-input>
+
+<pl-multiple-choice answers-name="mc" order="fixed">
+  <pl-answer correct="false">Opção um</pl-answer>
+  <pl-answer correct="true">Opção dois</pl-answer>
+  <pl-answer correct="false">Opção três</pl-answer>
+</pl-multiple-choice>
+
+<pl-checkbox answers-name="cb" order="fixed" partial-credit="net-correct">
+  <pl-answer correct="true">Item um</pl-answer>
+  <pl-answer correct="false">Item dois</pl-answer>
+  <pl-answer correct="true">Item três</pl-answer>
+  <pl-answer correct="false">Item quatro</pl-answer>
+</pl-checkbox>

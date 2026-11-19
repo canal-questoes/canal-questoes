@@ -1,0 +1,35 @@
+# Raiz virtual do workspace uv: sem [project]; membros server/ e client/.
+[tool.uv.workspace]
+members = ["server", "client"]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1,<10",
+    "jsonschema>=4.23,<5",
+    "pyyaml>=6,<7",
+    "httpx2>=2.13,<3",
+    "pytest-xdist==3.8.0",
+    "pytest-cov==7.1.0",
+    "coverage==7.17.2",
+    "ruff==0.17.3",
+]
+
+# O lint bloqueante do CI (`uv run ruff check server/src client/src ops scripts`): os erros de estilo (E), os do
+# pyflakes (F) e os avisos (W), com linhas de até 120 colunas.
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "W"]
+
+# A cobertura do job `fast` do CI (`ops/ci/ci_suite.py fast --coverage-xml coverage.xml`): o servidor e o cliente,
+# medidos no processo do pytest e nos subprocessos que herdam o ambiente (`patch = ["subprocess"]`); os subprocessos
+# com ambiente explícito ficam fora, e o número é uma subestimativa.
+[tool.coverage.run]
+source = ["server/src/cq_server", "client/src/cq_client"]
+relative_files = true
+patch = ["subprocess"]
+
+[tool.coverage.xml]
+output = "coverage.xml"

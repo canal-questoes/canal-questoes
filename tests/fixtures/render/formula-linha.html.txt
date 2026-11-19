@@ -1,0 +1,1 @@
+Se <code>0 &lt; x</code>, a área é <code>\pi x^2</code>.

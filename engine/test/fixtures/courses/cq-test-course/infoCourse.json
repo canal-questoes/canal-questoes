@@ -1,0 +1,19 @@
+{
+  "uuid": "7c1f3a52-5d0e-4c3b-9a41-0f6c2b1e9d11",
+  "name": "CQ101",
+  "title": "Curso de teste do canal-questoes (fixtures do engine)",
+  "topics": [
+    {
+      "name": "Teste",
+      "color": "gray1",
+      "description": "Questões de teste do motor"
+    }
+  ],
+  "tags": [
+    {
+      "name": "teste",
+      "color": "gray1",
+      "description": "Questão de teste"
+    }
+  ]
+}

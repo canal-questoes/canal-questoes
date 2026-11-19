@@ -1,0 +1,72 @@
+# Valores fictícios aceitos pela varredura da exportação e do pacote.
+#
+# Formato: "<tipo><TAB><valor>", um por linha; linhas vazias e as que começam com "#" são ignoradas. O tipo é um dos
+# 11 de repo_scan.FINDING_KINDS; a exceção vale só para o tipo da linha, qualquer que seja ele.
+#
+# O valor comparado (igualdade exata, com caixa) é o trecho que o detector acusa: em env_assignment, o que vem
+# depois do "=" ou ":" e dos espaços, até o primeiro espaço, aspas, crase ou barra invertida, ou, na expansão
+# "${CQ_X:-v}" (e ":=", ":+"), o valor-padrão v sem espaços nas pontas nem aspas em volta; em ra, os dígitos; nos
+# demais (email, phone, telegram_bot_token...), o texto casado inteiro. Os e-mails de example.com/.org/.net e dos
+# seus subdomínios, e os de *.invalid, *.test e *.localhost, já são reservados e não precisam constar aqui.
+#
+# Conferido por tests/contract/test_export_lists.py: fora das árvores de teste (tests/, engine/test/) e de
+# docs/operacao/, a árvore exportável não tem achado nem sem estas exceções. Todos os valores abaixo são fictícios,
+# dos testes (o arquivo no comentário de cada grupo).
+
+# tokens de bot fictícios (tests/helpers/log_samples.py; tests/unit/test_secretbox.py)
+telegram_bot_token	5550001234:AAHsentinelaBotLogs_Mcp9Xq4Lw7Rt2Zk
+telegram_bot_token	6100000001:AbCdEfGhIjKlMnOpQrStUvWxYz0123456-_
+
+# telefone fictício (tests/unit/test_minimize_update.py)
+phone	+55 19 99999-0000
+# a forma com DDD entre parênteses citada pelos testes da exportação (tests/unit/test_export_public.py)
+phone	(19) 99999-0000
+
+# RAs fictícios (tests/cli/test_api_client.py, tests/integration/test_people_api.py, test_free_messages.py,
+# test_students_import_api.py, tests/unit/test_redaction.py)
+ra	98765
+ra	123456
+ra	1234567
+ra	77000001
+
+# atribuições de modelo e sentinelas dos testes (tests/helpers/cli_runner.py; tests/helpers/docker_fake.py;
+# tests/contract/test_deploy_files.py) e a comparação "CQ_MASTER_KEY == ..." citada num documento de pesquisa
+# privado (a varredura dos segredos cobre a árvore versionada inteira)
+env_assignment	{ENV_SENTINEL}
+env_assignment	{ENV_SENTINEL_TOKEN}
+env_assignment	{ENV_SENTINEL}-chave
+env_assignment	{SENTINEL_SECRET}
+env_assignment	abc
+env_assignment	=
+# sentinela dos testes da rotina de cópia de segurança (tests/unit/test_backup_routine.py: o .env que a rotina não
+# pode ler)
+env_assignment	nao-pode-ser-lida
+# valores-padrão literais de "${CQ_X:-v}" dos casos negativos do compose (tests/contract/test_deploy_files.py), também
+# citados num patch histórico de revisão e no relato de uma parada limpa do loop, ambos privados
+env_assignment	senha
+env_assignment	senha123
+
+# e-mails de teste fora dos domínios reservados: endereços de URL de banco e de API com senha sentinela, versões
+# de pacote no formato nome@versão, domínios curtos de exemplo e IDN
+email	SenhaSentinelaDb9@db.example
+email	SenhaSentinelaUrl@127.0.0.1
+email	SenhaSentinelaUrl@api.telegram.org
+email	a@b.org
+email	Aluno.IDN@xn--exmple-cua.org
+email	aluno@xn--mnchen-3ya.example.de
+email	b@x.org
+email	cq@127.0.0.1
+email	cq@db.example
+# o usuário genérico das URLs SSH do GitHub (tests/unit/test_check_question_refs.py)
+email	git@github.com
+email	logs.go@v2.26.1
+email	mustache@4.2.0
+email	postgres@127.0.0.1
+email	processo@outro.example
+email	prof@x.org
+email	senha-que-nao-pode-vazar@127.0.0.1
+email	senha-sentinela@cq.exemplo.br
+email	senhasentinela@127.0.0.1
+email	usuario@api.telegram.org
+email	x@127.0.0.1
+email	zefiro.canario@canario.example.comx

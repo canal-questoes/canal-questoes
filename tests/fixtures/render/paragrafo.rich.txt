@@ -1,0 +1,1 @@
+<p>Um corpo <b>percorre</b> 13 m em <i>2 s</i>, com <u>atrito</u> e <s>sem</s> vento.<br>Calcule x<sup>2</sup> e a<sub>1</sub> &amp; b &lt; c.</p><p>Segundo parágrafo.</p>

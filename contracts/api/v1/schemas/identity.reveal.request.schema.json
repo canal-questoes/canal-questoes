@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://canal-questoes.invalid/contracts/api/v1/schemas/identity.reveal.request.schema.json",
+  "title": "POST /v1/identity/reveal — pedido",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "pseudonyms",
+    "reason"
+  ],
+  "properties": {
+    "pseudonyms": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "maxItems": 100
+    },
+    "reason": {
+      "type": "string"
+    }
+  }
+}

@@ -1,0 +1,60 @@
+name: Propor uma melhoria
+description: Uma funcionalidade nova ou uma mudança no que já existe. Proposals in English are welcome.
+title: "[Melhoria]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Obrigado pela proposta! O escopo do projeto é contido de propósito: veja os próximos passos no `ROADMAP.md`.
+        Uma ideia ainda em aberto pode começar pelas Discussions do repositório; para contribuir com código, veja o
+        `CONTRIBUTING.md`.
+
+        Não inclua segredos nem dados reais de alunos. Propostas em inglês também são aceitas.
+  - type: textarea
+    id: problema
+    attributes:
+      label: Problema ou necessidade
+      description: >-
+        O que você quer fazer e hoje não consegue, ou faz com dificuldade, e quem é afetado (professor, aluno ou quem
+        opera a pilha).
+    validations:
+      required: true
+  - type: textarea
+    id: proposta
+    attributes:
+      label: Proposta
+      description: >-
+        Como você imagina a solução. Se ela envolver uma operação nova, diga como a operação apareceria na API, no CLI e
+        no MCP.
+    validations:
+      required: true
+  - type: textarea
+    id: alternativas
+    attributes:
+      label: Alternativas consideradas
+  - type: dropdown
+    id: parte
+    attributes:
+      label: Parte afetada
+      multiple: true
+      options:
+        - CLI (cq)
+        - API
+        - Worker e bots do Telegram
+        - Motor de questões e correção
+        - Servidor MCP e plugin do Claude Code
+        - Pilha local (Docker Compose)
+        - Scripts de operação
+        - Documentação
+        - Outra ou não sei
+  - type: checkboxes
+    id: confirmacoes
+    attributes:
+      label: Confirmações
+      options:
+        - label: Procurei nas issues e nas discussões e não achei uma proposta igual.
+          required: true
+        - label: Li os próximos passos do `ROADMAP.md`.
+        - label: Esta proposta não traz segredo nem dado pessoal real.
+          required: true

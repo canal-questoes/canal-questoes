@@ -1,0 +1,19 @@
+{
+  "uuid": "2b8e6d40-1a9f-4e7c-8d35-6f0a9c3b4e22",
+  "name": "CQ102",
+  "title": "Curso de teste com elementos do curso (canal-questoes)",
+  "topics": [
+    {
+      "name": "Teste",
+      "color": "gray1",
+      "description": "Questões de teste do motor"
+    }
+  ],
+  "tags": [
+    {
+      "name": "teste",
+      "color": "gray1",
+      "description": "Questão de teste"
+    }
+  ]
+}

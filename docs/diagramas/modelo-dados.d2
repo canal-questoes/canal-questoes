@@ -1,0 +1,125 @@
+# Modelo de dados — as tabelas principais, com uma seleção das colunas (as migrações têm o esquema completo)
+# As chaves são internas (bigint); fora do banco, a pessoa aparece só pelo pseudo_id.
+direction: right
+
+people: {
+  shape: sql_table
+  id: bigint {constraint: primary_key}
+  pseudo_id: "uuid (único)"
+  alias: "text (único)"
+}
+identities: {
+  shape: sql_table
+  person_id: bigint {constraint: [primary_key; foreign_key]}
+  full_name: "text (identidade)"
+  ra: "text (identidade)"
+  email: "text (identidade)"
+}
+delivery_endpoints: {
+  shape: sql_table
+  id: bigint {constraint: primary_key}
+  person_id: bigint {constraint: foreign_key}
+  bot_id: bigint {constraint: foreign_key}
+  channel: text
+  chat_id: "bigint (identidade)"
+  state: text
+}
+offerings: {
+  shape: sql_table
+  id: bigint {constraint: primary_key}
+  offering_id: "uuid (único)"
+  course: text
+  term: text
+  timezone: text
+  state: text
+}
+bots: {
+  shape: sql_table
+  id: bigint {constraint: primary_key}
+  offering_id: bigint {constraint: foreign_key}
+  username: text
+  token_ciphertext: bytea
+  lease_until: timestamptz
+}
+enrollments: {
+  shape: sql_table
+  id: bigint {constraint: primary_key}
+  person_id: bigint {constraint: foreign_key}
+  offering_id: bigint {constraint: foreign_key}
+  role: text
+  state: text
+  terms_version: integer
+}
+invites: {
+  shape: sql_table
+  id: bigint {constraint: primary_key}
+  enrollment_id: bigint {constraint: foreign_key}
+  code_sha256: text
+  expires_at: timestamptz
+  state: text
+}
+question_refs: {
+  shape: sql_table
+  id: bigint {constraint: primary_key}
+  repo: text
+  commit_sha: text
+  qid: text
+}
+dispatches: {
+  shape: sql_table
+  id: bigint {constraint: primary_key}
+  offering_id: bigint {constraint: foreign_key}
+  question_ref_id: bigint {constraint: foreign_key}
+  opens_at: timestamptz
+  closes_at: timestamptz
+  state: text
+}
+deliveries: {
+  shape: sql_table
+  id: bigint {constraint: primary_key}
+  dispatch_id: bigint {constraint: foreign_key}
+  enrollment_id: bigint {constraint: foreign_key}
+  delivery_endpoint_id: bigint {constraint: foreign_key}
+  seed: bigint
+  state: text
+}
+delivery_contents: {
+  shape: sql_table
+  delivery_id: bigint {constraint: [primary_key; foreign_key]}
+  snapshot: jsonb
+  ir: jsonb
+}
+submissions: {
+  shape: sql_table
+  id: bigint {constraint: primary_key}
+  delivery_id: bigint {constraint: foreign_key}
+  raw_input: jsonb
+  valid: boolean
+  normalized_fields: "text[]"
+  score: "double precision"
+  late: boolean
+}
+free_messages: {
+  shape: sql_table
+  id: bigint {constraint: primary_key}
+  offering_id: bigint {constraint: foreign_key}
+  delivery_endpoint_id: bigint {constraint: foreign_key}
+  text: "text (livre, com redação)"
+}
+
+identities.person_id -> people.id
+delivery_endpoints.person_id -> people.id
+delivery_endpoints.bot_id -> bots.id
+enrollments.person_id -> people.id
+enrollments.offering_id -> offerings.id
+bots.offering_id -> offerings.id
+invites.enrollment_id -> enrollments.id
+dispatches.offering_id -> offerings.id
+dispatches.question_ref_id -> question_refs.id
+deliveries.dispatch_id -> dispatches.id
+deliveries.enrollment_id -> enrollments.id
+deliveries.delivery_endpoint_id -> delivery_endpoints.id
+delivery_contents.delivery_id -> deliveries.id
+submissions.delivery_id -> deliveries.id
+free_messages.offering_id -> offerings.id
+free_messages.delivery_endpoint_id -> delivery_endpoints.id

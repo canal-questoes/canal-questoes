@@ -1,0 +1,4 @@
+Um corpo percorre 13 m em 2 s, com atrito e sem vento.
+Calcule x^(2) e a_(1) & b < c.
+
+Segundo parágrafo.

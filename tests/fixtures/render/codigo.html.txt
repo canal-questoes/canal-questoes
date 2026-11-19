@@ -1,0 +1,4 @@
+<b>Use </b><code>len(s)</code><b> assim:</b>
+
+<pre><code class="language-python">if a &lt; b:
+    print("ok &amp; fim")</code></pre>

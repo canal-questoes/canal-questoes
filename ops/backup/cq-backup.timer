@@ -1,0 +1,17 @@
+# Agendamento diário do backup do canal-questoes.
+#
+# Dispara o cq-backup.service todo dia às 03:30 UTC, com até 10 minutos de atraso aleatório.
+# Persistent=true faz o systemd rodar na próxima subida a execução perdida com a VM desligada.
+# O guia (docs/operacao/implantacao-vm.md, seção 10) instala esta unidade com um comando pronto.
+# Nada nesta unidade nem no serviço lê o .env da pilha.
+
+[Unit]
+Description=Agendamento diário do backup do canal-questoes
+
+[Timer]
+OnCalendar=*-*-* 03:30:00 UTC
+Persistent=true
+RandomizedDelaySec=10min
+
+[Install]
+WantedBy=timers.target

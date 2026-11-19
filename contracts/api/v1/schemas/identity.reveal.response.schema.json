@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://canal-questoes.invalid/contracts/api/v1/schemas/identity.reveal.response.schema.json",
+  "title": "POST /v1/identity/reveal — 200",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "people",
+    "not_found"
+  ],
+  "properties": {
+    "people": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "pseudo_id",
+          "alias",
+          "name",
+          "ra",
+          "email"
+        ],
+        "properties": {
+          "pseudo_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "alias": {
+            "type": "string",
+            "pattern": "^(?=[0-9a-f]*[a-f])[0-9a-f]{4,32}$"
+          },
+          "name": {
+            "type": "string",
+            "x-identity": "name",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "ra": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[0-9]{1,10}$",
+            "x-identity": "ra"
+          },
+          "email": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "x-identity": "email",
+            "maxLength": 254
+          }
+        }
+      }
+    },
+    "not_found": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^(?:(?=[0-9a-f]*[a-f])[0-9a-f]{4,32}|[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$"
+      }
+    }
+  }
+}

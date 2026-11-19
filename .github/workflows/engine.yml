@@ -1,0 +1,68 @@
+# Suíte do motor no CI.
+#
+# Roda à mão e quando muda o motor, os contratos do motor ou a fixação do PL (o `FROM` do engine/Dockerfile, já coberto
+# por `engine/**` e repetido abaixo de propósito). O filtro de caminhos vale para o workflow inteiro, sem ação de
+# terceiros.
+#
+# O job cria o oráculo (`pl-oracle`, a imagem do PL fixada por commit e digest, a mesma do engine/Dockerfile) e chama
+# `scripts/run-engine-suite.sh`, que constrói as imagens, roda os testes na imagem restrita, a conformidade contra o
+# oráculo e confere o congelamento dos testes do motor.
+#
+# [I] A conformidade roda com o `node` do runner e precisa de um Node que leia TypeScript (`node --test` sobre `.ts`;
+# o motor foi validado com o Node 24). Sem uma ação de instalação do Node
+# conferida, o passo abaixo escolhe o Node mais novo do cache de ferramentas do runner; a primeira execução
+# real confere a versão (docs/operacao/ci-e-exportacao.md).
+name: Motor
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - engine/**
+      - contracts/engine/**
+      - engine/Dockerfile
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  engine:
+    name: Suíte do motor e conformidade com o PL
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - name: Obter o código
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Escolher o Node do runner
+        run: |
+          best="$(ls -d "$RUNNER_TOOL_CACHE"/node/*/x64 2>/dev/null | sort -V | tail -n 1 || true)"
+          if [ -n "$best" ]; then
+            echo "$best/bin" >> "$GITHUB_PATH"
+            export PATH="$best/bin:$PATH"
+          fi
+          major="$(node -p 'process.versions.node.split(".")[0]')"
+          node --version
+          if [ "$major" -lt 22 ]; then
+            echo "o Node do runner não lê TypeScript (é preciso o 22 ou mais novo)" >&2
+            exit 1
+          fi
+          if [ "$major" -lt 24 ]; then
+            echo "NODE_OPTIONS=--experimental-strip-types" >> "$GITHUB_ENV"
+          fi
+
+      - name: Criar o oráculo (pl-oracle)
+        # A imagem do PL fixada por commit e digest, a mesma do `FROM` do engine/Dockerfile.
+        run: |
+          docker run -d --name pl-oracle -p 127.0.0.1:3000:3000 prairielearn/prairielearn:a193f72048530a4499252c454acca963cdf98922@sha256:c2b033eba27657a022ca82535cf48b4098bae02609e7f23114512bcf2d0ea4b6
+
+      - name: Rodar a suíte do motor
+        env:
+          CQ_SUITE_OUT: ${{ runner.temp }}/engine-suite
+        run: bash scripts/run-engine-suite.sh ci

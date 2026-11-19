@@ -1,0 +1,28 @@
+# Loop de desenvolvimento por fatia — spec-kit, revisão adversarial dupla e testes congelados
+# Os testes vêm primeiro, passam pela revisão dupla (Codex e Claude) e congelam por hashes; o código passa pela
+# mesma revisão dupla depois da convergência.
+direction: down
+
+classes: {
+  implementador: {style.fill: "#EEEDFE"; style.stroke: "#534AB7"}
+  independente: {style.fill: "#E1F5EE"; style.stroke: "#0F6E56"}
+  automatico: {style.fill: "#F1EFE8"; style.stroke: "#5F5E5A"}
+}
+
+artefatos: "specify → clarify → plan → tasks → analyze" {class: automatico}
+testes: "Testes escritos primeiro\nfalham antes da implementação" {class: implementador}
+revisao: "Revisão adversarial dupla dos testes\nCodex e Claude, só leitura, veredito em JSON" {class: independente}
+congelar: "Testes congelados\nhashes SHA-256 registrados" {class: automatico}
+implementar: "Implementação\nsem tocar nos testes" {class: implementador}
+rodar: "Suíte de testes" {class: automatico}
+converge: "Convergência\ncódigo contra spec e tarefas" {class: independente}
+revcod: "Revisão adversarial dupla do código" {class: independente}
+pronto: "Fatia convergida\nrevisão humana adiada" {class: automatico}
+proxima: "Próxima fatia\nbranch encadeada nesta" {class: automatico}
+
+artefatos -> testes -> revisao -> congelar -> implementar -> rodar -> converge -> revcod -> pronto -> proxima
+revisao -> testes: "bloqueio de qualquer revisor" {style.stroke-dash: 4}
+rodar -> implementar: "falhas" {style.stroke-dash: 4}
+converge -> implementar: "tarefas novas" {style.stroke-dash: 4}
+revcod -> implementar: "bloqueios" {style.stroke-dash: 4}
+implementar -> revisao: "teste errado: reabertura" {style.stroke-dash: 4}

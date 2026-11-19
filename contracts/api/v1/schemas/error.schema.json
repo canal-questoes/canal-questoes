@@ -1,0 +1,818 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://canal-questoes.invalid/contracts/api/v1/schemas/error.schema.json",
+  "title": "Envelope de erro da API v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "error"
+  ],
+  "properties": {
+    "error": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "code",
+        "message"
+      ],
+      "properties": {
+        "code": {
+          "enum": [
+            "invalid_request",
+            "unauthenticated",
+            "forbidden",
+            "not_found",
+            "method_not_allowed",
+            "conflict",
+            "already_exists",
+            "invalid_state",
+            "bot_conflict",
+            "bot_required",
+            "invalid_confirmation",
+            "list_conflict",
+            "role_conflict",
+            "invalid_dispatch_state",
+            "window_expired",
+            "grading_pending",
+            "internal",
+            "unavailable",
+            "not_configured",
+            "purge_pending",
+            "purge_changed"
+          ]
+        },
+        "message": {
+          "type": "string"
+        },
+        "permission": {
+          "enum": [
+            "bots:manage",
+            "events:read",
+            "identity:reveal",
+            "offerings:read",
+            "offerings:write",
+            "people:read",
+            "people:write",
+            "tokens:manage"
+          ]
+        },
+        "state": {
+          "enum": [
+            "draft",
+            "active",
+            "closed",
+            "archived"
+          ]
+        },
+        "fields": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "field",
+              "reason"
+            ],
+            "properties": {
+              "field": {
+                "type": "string",
+                "pattern": "^(body|query|X-CQ-Client|[a-z_]+(\\[[0-9]+\\])?)$"
+              },
+              "reason": {
+                "enum": [
+                  "missing",
+                  "unknown_field",
+                  "invalid_format",
+                  "too_short",
+                  "too_long",
+                  "too_few",
+                  "too_many",
+                  "out_of_range",
+                  "invalid_value",
+                  "duplicate"
+                ]
+              }
+            }
+          },
+          "minItems": 1
+        },
+        "pending": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "outbox",
+            "updates",
+            "tasks",
+            "freeze",
+            "due"
+          ],
+          "properties": {
+            "outbox": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "updates": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "tasks": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "freeze": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "due": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        }
+      },
+      "oneOf": [
+        {
+          "properties": {
+            "code": {
+              "const": "invalid_request"
+            },
+            "message": {
+              "const": "Pedido inválido."
+            }
+          },
+          "required": [
+            "code",
+            "message",
+            "fields"
+          ],
+          "not": {
+            "anyOf": [
+              {
+                "required": [
+                  "permission"
+                ]
+              },
+              {
+                "required": [
+                  "state"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "properties": {
+            "code": {
+              "const": "unauthenticated"
+            },
+            "message": {
+              "const": "Token ausente, inválido ou revogado."
+            }
+          },
+          "required": [
+            "code",
+            "message"
+          ],
+          "not": {
+            "anyOf": [
+              {
+                "required": [
+                  "fields"
+                ]
+              },
+              {
+                "required": [
+                  "permission"
+                ]
+              },
+              {
+                "required": [
+                  "state"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "properties": {
+            "code": {
+              "const": "forbidden"
+            },
+            "message": {
+              "const": "Este token não tem a permissão necessária."
+            }
+          },
+          "required": [
+            "code",
+            "message",
+            "permission"
+          ],
+          "not": {
+            "anyOf": [
+              {
+                "required": [
+                  "fields"
+                ]
+              },
+              {
+                "required": [
+                  "state"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "properties": {
+            "code": {
+              "const": "not_found"
+            },
+            "message": {
+              "const": "Recurso não encontrado."
+            }
+          },
+          "required": [
+            "code",
+            "message"
+          ],
+          "not": {
+            "anyOf": [
+              {
+                "required": [
+                  "fields"
+                ]
+              },
+              {
+                "required": [
+                  "permission"
+                ]
+              },
+              {
+                "required": [
+                  "state"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "properties": {
+            "code": {
+              "const": "method_not_allowed"
+            },
+            "message": {
+              "const": "Método não permitido."
+            }
+          },
+          "required": [
+            "code",
+            "message"
+          ],
+          "not": {
+            "anyOf": [
+              {
+                "required": [
+                  "fields"
+                ]
+              },
+              {
+                "required": [
+                  "permission"
+                ]
+              },
+              {
+                "required": [
+                  "state"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "properties": {
+            "code": {
+              "const": "conflict"
+            },
+            "message": {
+              "const": "Já existe uma pessoa com esse RA ou e-mail."
+            }
+          },
+          "required": [
+            "code",
+            "message",
+            "fields"
+          ],
+          "not": {
+            "anyOf": [
+              {
+                "required": [
+                  "permission"
+                ]
+              },
+              {
+                "required": [
+                  "state"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "properties": {
+            "code": {
+              "const": "already_exists"
+            },
+            "message": {
+              "const": "Já existe um oferecimento com esse código."
+            }
+          },
+          "required": [
+            "code",
+            "message",
+            "fields"
+          ],
+          "not": {
+            "anyOf": [
+              {
+                "required": [
+                  "permission"
+                ]
+              },
+              {
+                "required": [
+                  "state"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "properties": {
+            "code": {
+              "const": "invalid_state"
+            },
+            "message": {
+              "const": "A operação não é permitida no estado atual do oferecimento."
+            }
+          },
+          "required": [
+            "code",
+            "message",
+            "state"
+          ],
+          "not": {
+            "anyOf": [
+              {
+                "required": [
+                  "fields"
+                ]
+              },
+              {
+                "required": [
+                  "permission"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "properties": {
+            "code": {
+              "const": "bot_conflict"
+            },
+            "message": {
+              "const": "Esse bot não pode ser usado neste oferecimento."
+            }
+          },
+          "required": [
+            "code",
+            "message",
+            "fields"
+          ],
+          "not": {
+            "anyOf": [
+              {
+                "required": [
+                  "permission"
+                ]
+              },
+              {
+                "required": [
+                  "state"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "properties": {
+            "code": {
+              "const": "bot_required"
+            },
+            "message": {
+              "const": "O oferecimento não tem um bot registrado com acesso."
+            }
+          },
+          "required": [
+            "code",
+            "message"
+          ],
+          "not": {
+            "anyOf": [
+              {
+                "required": [
+                  "fields"
+                ]
+              },
+              {
+                "required": [
+                  "permission"
+                ]
+              },
+              {
+                "required": [
+                  "state"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "properties": {
+            "code": {
+              "const": "invalid_confirmation"
+            },
+            "message": {
+              "const": "O código de confirmação é inválido ou venceu."
+            }
+          },
+          "required": [
+            "code",
+            "message"
+          ],
+          "not": {
+            "anyOf": [
+              {
+                "required": [
+                  "fields"
+                ]
+              },
+              {
+                "required": [
+                  "permission"
+                ]
+              },
+              {
+                "required": [
+                  "state"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "properties": {
+            "code": {
+              "const": "list_conflict"
+            },
+            "message": {
+              "const": "Há linhas da lista em conflito com pessoas cadastradas ou com a equipe; nada foi gravado."
+            }
+          },
+          "required": [
+            "code",
+            "message",
+            "fields"
+          ],
+          "not": {
+            "anyOf": [
+              {
+                "required": [
+                  "permission"
+                ]
+              },
+              {
+                "required": [
+                  "state"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "properties": {
+            "code": {
+              "const": "role_conflict"
+            },
+            "message": {
+              "const": "A mesma pessoa não pode ser equipe e aluno do mesmo oferecimento."
+            }
+          },
+          "required": [
+            "code",
+            "message",
+            "fields"
+          ],
+          "not": {
+            "anyOf": [
+              {
+                "required": [
+                  "permission"
+                ]
+              },
+              {
+                "required": [
+                  "state"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "properties": {
+            "code": {
+              "const": "invalid_dispatch_state"
+            },
+            "message": {
+              "const": "A operação não é permitida no estado atual do disparo."
+            }
+          },
+          "required": [
+            "code",
+            "message"
+          ],
+          "not": {
+            "anyOf": [
+              {
+                "required": [
+                  "fields"
+                ]
+              },
+              {
+                "required": [
+                  "permission"
+                ]
+              },
+              {
+                "required": [
+                  "state"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "properties": {
+            "code": {
+              "const": "window_expired"
+            },
+            "message": {
+              "const": "A janela do disparo não é mais válida; prepare um novo disparo."
+            }
+          },
+          "required": [
+            "code",
+            "message"
+          ],
+          "not": {
+            "anyOf": [
+              {
+                "required": [
+                  "fields"
+                ]
+              },
+              {
+                "required": [
+                  "permission"
+                ]
+              },
+              {
+                "required": [
+                  "state"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "properties": {
+            "code": {
+              "const": "grading_pending"
+            },
+            "message": {
+              "const": "Há respostas aguardando correção ou mensagens ainda não processadas neste oferecimento."
+            }
+          },
+          "required": [
+            "code",
+            "message"
+          ],
+          "not": {
+            "anyOf": [
+              {
+                "required": [
+                  "fields"
+                ]
+              },
+              {
+                "required": [
+                  "permission"
+                ]
+              },
+              {
+                "required": [
+                  "state"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "properties": {
+            "code": {
+              "const": "internal"
+            },
+            "message": {
+              "const": "Erro interno. Tente de novo mais tarde."
+            }
+          },
+          "required": [
+            "code",
+            "message"
+          ],
+          "not": {
+            "anyOf": [
+              {
+                "required": [
+                  "fields"
+                ]
+              },
+              {
+                "required": [
+                  "permission"
+                ]
+              },
+              {
+                "required": [
+                  "state"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "properties": {
+            "code": {
+              "const": "unavailable"
+            },
+            "message": {
+              "const": "O Telegram não respondeu. Tente de novo em instantes."
+            }
+          },
+          "required": [
+            "code",
+            "message"
+          ],
+          "not": {
+            "anyOf": [
+              {
+                "required": [
+                  "fields"
+                ]
+              },
+              {
+                "required": [
+                  "permission"
+                ]
+              },
+              {
+                "required": [
+                  "state"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "properties": {
+            "code": {
+              "const": "not_configured"
+            },
+            "message": {
+              "const": "O servidor não tem a chave-mestra dos bots configurada."
+            }
+          },
+          "required": [
+            "code",
+            "message"
+          ],
+          "not": {
+            "anyOf": [
+              {
+                "required": [
+                  "fields"
+                ]
+              },
+              {
+                "required": [
+                  "permission"
+                ]
+              },
+              {
+                "required": [
+                  "state"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "properties": {
+            "code": {
+              "const": "purge_pending"
+            },
+            "message": {
+              "const": "Há trabalho pendente neste oferecimento; o expurgo só pode ser feito depois que ele terminar."
+            }
+          },
+          "required": [
+            "code",
+            "message",
+            "pending"
+          ],
+          "not": {
+            "anyOf": [
+              {
+                "required": [
+                  "fields"
+                ]
+              },
+              {
+                "required": [
+                  "permission"
+                ]
+              },
+              {
+                "required": [
+                  "state"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "properties": {
+            "code": {
+              "const": "purge_changed"
+            },
+            "message": {
+              "const": "As contagens do expurgo mudaram desde a preparação; prepare de novo e confira o impacto."
+            }
+          },
+          "required": [
+            "code",
+            "message"
+          ],
+          "not": {
+            "anyOf": [
+              {
+                "required": [
+                  "fields"
+                ]
+              },
+              {
+                "required": [
+                  "permission"
+                ]
+              },
+              {
+                "required": [
+                  "state"
+                ]
+              },
+              {
+                "required": [
+                  "pending"
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "if": {
+        "properties": {
+          "code": {
+            "const": "purge_pending"
+          }
+        }
+      },
+      "else": {
+        "not": {
+          "required": [
+            "pending"
+          ]
+        }
+      }
+    }
+  }
+}

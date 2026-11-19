@@ -1,0 +1,48 @@
+# Referências funcionais que o detector de códigos internos acusaria e que ficam na árvore pública.
+#
+# Formato: "<caminho><TAB><texto aceito><TAB><motivo>", uma entrada por linha; linhas vazias e as que começam com "#"
+# são ignoradas. O caminho é um arquivo exato da árvore exportada (sem padrão); o texto aceito é o trecho exato que o
+# detector acusaria, e a entrada aceita toda ocorrência dele no arquivo; o motivo é uma frase em português, sem código
+# interno. Só a coluna do texto aceito fica fora da varredura: o caminho, o motivo e estes comentários são varridos.
+#
+# Cada entrada é necessária (casa pelo menos uma ocorrência na exportação) e cobre só referências funcionais: as
+# que o código usa, nunca as de comentário, docstring ou mensagem, que a limpeza tira. Conferido por
+# tests/contract/test_export_lists.py (a forma) e tests/contract/test_public_tree.py (a necessidade e as zonas).
+
+# Fora dos testes: o que a imagem, o git, o CI, a exportação e a suíte do motor deixam de fora ou leem no privado
+.dockerignore	specs/	referência funcional: o contexto da imagem não leva as especificações das fatias
+.dockerignore	spikes/	referência funcional: o contexto da imagem não leva os experimentos
+.gitignore	.specify/	referência funcional: o git ignora as execuções locais da ferramenta de especificação
+ops/ci/ci_suite.py	docs/execucao/	referência funcional: o caminho da lista privada de instáveis, lida só no repositório privado
+ops/export/export_public.py	docs/execucao/	referência funcional: a exportação deriva a lista pública de instáveis da lista privada
+scripts/run-engine-suite.sh	specs/	referência funcional: a lista de congelamento dos testes do motor, conferida só no repositório privado
+docs/operacao/ci-e-exportacao.md	specs/	referência funcional: o comando de conferência mostra que a pasta privada não sai na exportação
+
+# Nos testes: a curva do certificado de teste
+tests/helpers/smtp.py	P-256	curva elíptica do certificado de teste, não um código interno
+
+# Nos testes do motor: os rótulos de uma figura de teste
+engine/test/integration/ir.test.ts	R1	rótulo de uma figura de teste, comparado com o texto alternativo da fixture, não um código interno
+engine/test/integration/ir.test.ts	R2	rótulo de uma figura de teste, comparado com o texto alternativo da fixture, não um código interno
+engine/test/fixtures/courses/cq-test-course/questions/supported/ir-media-executor/question.html	R1	texto alternativo de uma figura de teste, que o teste do motor compara, não um código interno
+engine/test/fixtures/courses/cq-test-course/questions/supported/ir-media-executor/question.html	R2	texto alternativo de uma figura de teste, que o teste do motor compara, não um código interno
+
+# Nos testes: os caminhos privados que os testes da exportação, das listas, da árvore pública e do pacote usam
+tests/contract/test_export_lists.py	docs/execucao/	referência funcional: o teste das listas confere que esta pasta privada nunca sai
+tests/contract/test_export_lists.py	spec.md	referência funcional: a sonda confere que a lista positiva não pega o documento de uma especificação
+tests/contract/test_export_lists.py	docs/base-de-conhecimento/	referência funcional: o teste das listas confere que esta pasta privada nunca sai
+tests/contract/test_export_lists.py	docs/monografia/	referência funcional: o teste das listas confere que esta pasta privada nunca sai
+tests/contract/test_export_lists.py	docs/arquitetura/	referência funcional: o teste das listas confere que esta pasta privada nunca sai
+tests/contract/test_export_lists.py	.claude/	referência funcional: o teste das listas confere que esta pasta privada nunca sai
+tests/contract/test_export_lists.py	.specify/	referência funcional: o teste das listas confere que esta pasta privada nunca sai
+tests/contract/test_export_lists.py	specs/	referência funcional: o teste das listas confere que esta pasta privada nunca sai
+tests/contract/test_export_lists.py	spikes/	referência funcional: o teste das listas confere que esta pasta privada nunca sai
+tests/contract/test_plugin.py	.claude/	referência funcional: o teste do plugin lê a configuração do agente no privado e confere que ela não sai
+tests/contract/test_public_tree.py	.specify/	referência funcional: o teste dos princípios lê a constituição no repositório privado
+tests/privacy/test_canary_deploy.py	docs/execucao/	referência funcional: a fixture tem a lista privada de instáveis que a exportação lê
+tests/unit/test_export_public.py	docs/execucao/	referência funcional: a lista privada de instáveis que a exportação lê e os arquivos privados da fixture
+tests/unit/test_export_public.py	docs/base-de-conhecimento/	referência funcional: a fixture tem um arquivo nesta pasta privada, e o teste confere que ele não sai
+tests/unit/test_export_public.py	docs/monografia/	referência funcional: a fixture tem um arquivo nesta pasta privada, e o teste confere que ele não sai
+tests/unit/test_make_bundle.py	docs/execucao/	referência funcional: a fixture tem um arquivo nesta pasta privada, e o teste confere que ele não sai
+tests/unit/test_make_bundle.py	docs/base-de-conhecimento/	referência funcional: a fixture tem um arquivo nesta pasta privada, e o teste confere que ele não sai
+tests/unit/test_make_bundle.py	docs/monografia/	referência funcional: a fixture tem um arquivo nesta pasta privada, e o teste confere que ele não sai

@@ -1,0 +1,23 @@
+[project]
+name = "cq-server"
+version = "0.1.0"
+description = "canal-questoes: núcleo, API e worker"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "fastapi>=0.141,<0.142",
+    "pydantic>=2.13,<2.14",
+    "uvicorn>=0.53,<0.54",
+    "psycopg[binary]>=3.3,<3.4",
+    "email-validator>=2.3,<2.4",
+    "httpx2>=2.13,<3",
+    "httpcore2>=2.13,<3",
+    "cryptography>=50.0.1,<51",
+    "tzdata>=2026.4",
+]
+
+[project.scripts]
+cq-server = "cq_server.__main__:main"
+
+[build-system]
+requires = ["uv_build>=0.11.16,<0.12.0"]
+build-backend = "uv_build"

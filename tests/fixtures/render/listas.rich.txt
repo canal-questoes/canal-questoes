@@ -1,0 +1,1 @@
+<p>Passos:</p><ul><li>Ler a entrada</li><li>Somar <b>os</b> valores<ul><li>inteiros</li><li>reais</li></ul></li></ul><ol><li>Primeiro</li><li>Segundo</li></ol>

@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://canal-questoes.invalid/contracts/api/v1/schemas/invites.prepare_send.request.schema.json",
+  "title": "POST /v1/offerings/{ref}/invites/prepare — pedido",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [],
+  "properties": {
+    "valid_hours": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 720
+    }
+  }
+}

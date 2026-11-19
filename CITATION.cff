@@ -1,0 +1,24 @@
+cff-version: 1.2.0
+message: "Se você usar este software, cite-o pelos metadados deste arquivo."
+type: software
+title: "canal-questoes"
+abstract: >-
+  Sistema que entrega questões do PrairieLearn por bots do Telegram, um por oferecimento de disciplina, para a
+  avaliação formativa. Corrige as respostas com a mesma semântica do PrairieLearn, reutilizando o código dele dentro da
+  imagem oficial, e produz um relatório descritivo de cada disparo de questão. Os alunos aparecem só por pseudônimo. O
+  sistema é operado por uma API HTTP, pelo CLI cq e por um agente, pelo servidor MCP e pelo plugin do Claude Code.
+authors:
+  - given-names: "Pedro"
+    family-names: "Ribeiro"
+    affiliation: "Instituto de Computação, Universidade Estadual de Campinas (Unicamp)"
+version: "0.1.0"
+date-released: "2026-11-16"
+license: AGPL-3.0-or-later
+repository-code: "https://github.com/canal-questoes/canal-questoes"
+keywords:
+  - PrairieLearn
+  - Telegram
+  - avaliação formativa
+  - correção automática
+  - bot
+  - MCP

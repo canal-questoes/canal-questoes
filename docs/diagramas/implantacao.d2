@@ -1,0 +1,30 @@
+# Visão de implantação — containers e volumes
+direction: down
+
+classes: {
+  nosso: {style.fill: "#EEEDFE"; style.stroke: "#534AB7"}
+  motor: {style.fill: "#E1F5EE"; style.stroke: "#0F6E56"}
+  infra: {style.fill: "#F1EFE8"; style.stroke: "#5F5E5A"}
+  armazenamento: {style.fill: "#F1EFE8"; style.stroke: "#5F5E5A"; style.stroke-dash: 4}
+}
+
+vm: "VM Linux (docker compose)" {
+  api: "container api\nimagem do sistema\nsem estado; 1 réplica no piloto" {class: nosso}
+  worker: "container worker\nimagem do sistema\n1 dono por bot" {class: nosso}
+  engine: "container engine\nimagem do PL (hash fixo)\nsem estado; 1 réplica no piloto" {class: motor}
+  postgres: "container postgres\nimagem oficial" {class: infra}
+  pgdata: "volume pgdata\npersistente" {shape: stored_data; class: armazenamento}
+  repos: "volume repos\ndescartável" {shape: stored_data; class: armazenamento}
+
+  api <-> postgres
+  worker <-> postgres
+  worker -> engine
+  postgres -> pgdata
+  worker -> repos: "escreve"
+  engine -> repos: "lê"
+}
+
+dumps: "dumps cifrados na VM\n(pg_dump diário, 7 dias)" {class: armazenamento}
+backup: "cópia fora da VM\n(14 dias)" {class: armazenamento}
+vm.pgdata -> dumps {style.stroke-dash: 4}
+dumps -> backup {style.stroke-dash: 4}

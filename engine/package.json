@@ -1,0 +1,12 @@
+{
+  "name": "@canal-questoes/engine",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Motor de questões PrairieLearn do canal-questoes (roda dentro da imagem oficial do PL; sem dependências próprias).",
+  "scripts": {
+    "test": "node --test --test-concurrency=1 \"test/**/*.test.ts\"",
+    "typecheck": "node -e \"const p=require('path');const r=require('module').createRequire('/PrairieLearn/apps/prairielearn/');require('child_process').execFileSync(process.execPath,[p.join(p.dirname(r.resolve('typescript/package.json')),'lib/tsc.js'),'-p','tsconfig.json'],{stdio:'inherit'})\"",
+    "conformance": "node --test \"conformance/*.test.ts\""
+  }
+}

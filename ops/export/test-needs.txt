@@ -1,0 +1,46 @@
+# O que os testes e o CI leem fora de tests/.
+#
+# Formato: um caminho exato por linha, relativo à raiz do repositório, com "/"; linhas vazias e as que começam com
+# "#" são ignoradas. Uma entrada que termina em "/" é um diretório lido inteiro (rglob, iterdir ou o build do
+# pacote) e cobre tudo o que fica abaixo dele.
+#
+# Conferido por tests/contract/test_export_lists.py: cada entrada está na lista positiva (allowlist.txt; um
+# diretório só quando um padrão "X/**" o leva inteiro); a varredura estática dos testes (os caminhos montados a
+# partir de REPO e os de load_ops em tests/**/*.py) cabe aqui. Nenhuma entrada fica nas especificações das fatias:
+# elas nunca saem.
+#
+# Ficam de fora, por decisão declarada no teste (EXCLUDED_READS), as leituras de arquivos que a lista positiva nunca
+# leva: a configuração do agente lida pelo teste do plugin e a constituição lida pelo teste dos princípios públicos.
+
+# Diretórios lidos inteiros
+.github/workflows/
+client/
+contracts/
+docs/operacao/
+engine/
+ops/
+plugins/
+server/src/cq_server/
+
+# Arquivos da raiz
+.dockerignore
+.env.example
+Dockerfile
+LICENSE
+compose.yaml
+pyproject.toml
+pytest.ini
+uv.lock
+
+# Listas da exportação lidas pelos testes da árvore pública e dos contatos
+ops/export/accepted-codes.txt
+ops/export/public-contacts.txt
+
+# Outros arquivos
+scripts/check-frozen-engine-tests.sh
+scripts/compare_collection.py
+scripts/fetch_age.py
+scripts/run-engine-suite.sh
+scripts/run-suite.sh
+scripts/test-postgres.sh
+server/pyproject.toml

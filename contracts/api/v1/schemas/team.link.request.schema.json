@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://canal-questoes.invalid/contracts/api/v1/schemas/team.link.request.schema.json",
+  "title": "POST /v1/offerings/{ref}/team-links — pedido",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "person"
+  ],
+  "properties": {
+    "person": {
+      "type": "string",
+      "pattern": "^(?:(?=[0-9a-f]*[a-f])[0-9a-f]{4,32}|[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$"
+    },
+    "valid_hours": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 720
+    }
+  }
+}

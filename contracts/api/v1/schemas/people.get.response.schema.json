@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://canal-questoes.invalid/contracts/api/v1/schemas/people.get.response.schema.json",
+  "title": "GET /v1/people/{ref} — 200",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "pseudo_id",
+    "alias",
+    "created_at"
+  ],
+  "properties": {
+    "pseudo_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "alias": {
+      "type": "string",
+      "pattern": "^(?=[0-9a-f]*[a-f])[0-9a-f]{4,32}$"
+    },
+    "created_at": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,6})?Z$"
+    }
+  }
+}

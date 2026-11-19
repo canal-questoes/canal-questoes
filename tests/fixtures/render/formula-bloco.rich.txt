@@ -1,0 +1,1 @@
+<p>Calcule:</p><tg-math-block>\int_0^1 x\,dx = \frac{1}{2}</tg-math-block>

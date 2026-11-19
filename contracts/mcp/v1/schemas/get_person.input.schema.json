@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "person"
+  ],
+  "properties": {
+    "person": {
+      "type": "string",
+      "pattern": "^(?:(?=[0-9a-f]*[a-f])[0-9a-f]{4,32}|[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$"
+    }
+  }
+}

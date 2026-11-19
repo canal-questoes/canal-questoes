@@ -1,0 +1,79 @@
+[
+  {
+    "repo": "https://github.com/pedroraj/cq-demo-questoes.git",
+    "commit": "ca01df00085b0172af68253aeba93e76cd7f6ecb",
+    "qid": "arq-binario",
+    "field_type": "pl-integer-input",
+    "info_json_sha256": "5edf8b081b472582d1bb47d560b13323464fa00b4a35c6caed4ef397dc4cf99f"
+  },
+  {
+    "repo": "https://github.com/pedroraj/cq-demo-questoes.git",
+    "commit": "ca01df00085b0172af68253aeba93e76cd7f6ecb",
+    "qid": "arq-complemento",
+    "field_type": "pl-integer-input",
+    "info_json_sha256": "2796ae85d2d3861e69286110d47c709df5aa5674c8e962ce1592cfd69516c50a"
+  },
+  {
+    "repo": "https://github.com/pedroraj/cq-demo-questoes.git",
+    "commit": "ca01df00085b0172af68253aeba93e76cd7f6ecb",
+    "qid": "arq-desempenho",
+    "field_type": "pl-number-input",
+    "info_json_sha256": "2aa7860d2d555b7ec7f01e62fd05425170b96287cb33df496e81ecb402d7462d"
+  },
+  {
+    "repo": "https://github.com/pedroraj/cq-demo-questoes.git",
+    "commit": "ca01df00085b0172af68253aeba93e76cd7f6ecb",
+    "qid": "arq-hexa",
+    "field_type": "pl-string-input",
+    "info_json_sha256": "568e6dc714ee0b7dde6ff66a20cbb7490b494c81b9287295125ad50fca1648fe"
+  },
+  {
+    "repo": "https://github.com/pedroraj/cq-demo-questoes.git",
+    "commit": "ca01df00085b0172af68253aeba93e76cd7f6ecb",
+    "qid": "arq-potencias",
+    "field_type": "pl-checkbox",
+    "info_json_sha256": "c54eeaf1fa7169af554282cb3e8a912dfff5f7afaf8ad09b5e2e62e545dcc68e"
+  },
+  {
+    "repo": "https://github.com/pedroraj/cq-demo-questoes.git",
+    "commit": "ca01df00085b0172af68253aeba93e76cd7f6ecb",
+    "qid": "arq-riscv",
+    "field_type": "pl-multiple-choice",
+    "info_json_sha256": "0b7abcd0cc8427248f47428b012d85f05b70321fe33e2a564982e422571f36f8"
+  },
+  {
+    "repo": "https://github.com/pedroraj/cq-demo-questoes.git",
+    "commit": "ca01df00085b0172af68253aeba93e76cd7f6ecb",
+    "qid": "capital",
+    "field_type": "pl-multiple-choice",
+    "info_json_sha256": "6a3c9c6004d75b539eed9d1fca0f6c21bada3b486480b97e5252eac0c3120f16"
+  },
+  {
+    "repo": "https://github.com/pedroraj/cq-demo-questoes.git",
+    "commit": "ca01df00085b0172af68253aeba93e76cd7f6ecb",
+    "qid": "palavra",
+    "field_type": "pl-string-input",
+    "info_json_sha256": "ece69b5e2db9428241f5ca91056a0c9fd0daa91dfd482d88a88cbe6b63d95069"
+  },
+  {
+    "repo": "https://github.com/pedroraj/cq-demo-questoes.git",
+    "commit": "ca01df00085b0172af68253aeba93e76cd7f6ecb",
+    "qid": "primos",
+    "field_type": "pl-checkbox",
+    "info_json_sha256": "72e53c1d2f82618ae7a77491731c8fad8c0ecfa4e854583aa08ff600034e4711"
+  },
+  {
+    "repo": "https://github.com/pedroraj/cq-demo-questoes.git",
+    "commit": "ca01df00085b0172af68253aeba93e76cd7f6ecb",
+    "qid": "soma",
+    "field_type": "pl-integer-input",
+    "info_json_sha256": "5f38d8f7a95e9dde46a87e9479350bd3357ab158009739be8c3d6c080906c548"
+  },
+  {
+    "repo": "https://github.com/pedroraj/cq-demo-questoes.git",
+    "commit": "ca01df00085b0172af68253aeba93e76cd7f6ecb",
+    "qid": "velocidade",
+    "field_type": "pl-number-input",
+    "info_json_sha256": "26a9be5c6c9b022632bc0281f55cd94dfd261784d6743c0a9ab408f0dc7c9a6f"
+  }
+]

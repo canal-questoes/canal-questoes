@@ -1,0 +1,1 @@
+<p>Se <tg-math>0 &lt; x</tg-math>, a área é <tg-math>\pi x^2</tg-math>.</p>

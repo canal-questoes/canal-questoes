@@ -1,0 +1,47 @@
+# Contexto de construção da imagem. O Dockerfile só copia pyproject.toml,
+# uv.lock, client/pyproject.toml e server/; o resto fica fora do contexto por segurança.
+
+# Segredos e configuração local (nenhum segredo entra na imagem)
+.env
+.env*
+**/.env
+**/.env.*
+!.env.example
+*.pem
+*.key
+secrets/
+
+# Ambiente, caches e ferramentas locais
+.venv
+**/.venv
+**/__pycache__
+**/*.py[cod]
+.pytest_cache
+.ruff_cache
+.mypy_cache
+.coverage
+htmlcov
+*.egg-info
+.claude
+.specify
+
+# Controle de versão
+.git
+.gitattributes
+.gitignore
+
+# Fora da imagem: testes, especificações, documentação, spikes e dados
+tests/
+specs/
+docs/
+spikes/
+backups/
+data/
+*.dump
+*.sql.gz
+*.csv
+
+# Engine: as imagens engine/Dockerfile e engine/test/Dockerfile usam o mesmo
+# contexto na raiz e só copiam engine/ e contracts/engine/v1.
+**/node_modules
+engine/conformance/resultados

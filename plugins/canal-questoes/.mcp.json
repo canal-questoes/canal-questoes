@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "cq": {
+      "command": "cq",
+      "args": ["mcp"]
+    }
+  }
+}

@@ -1,0 +1,19 @@
+[project]
+name = "cq-client"
+version = "0.1.0"
+description = "canal-questoes: pacote cliente (cliente da API e CLI cq; base do servidor MCP)"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "click>=8.5,<9",
+    "httpx2>=2.13,<3",
+    "tzdata>=2026.4",
+    "mcp>=2.3,<2.4",
+    "jsonschema>=4.23,<5",
+]
+
+[project.scripts]
+cq = "cq_client.cli:main"
+
+[build-system]
+requires = ["uv_build>=0.11.16,<0.12.0"]
+build-backend = "uv_build"

@@ -1,0 +1,25 @@
+# Rotina de backup do canal-questoes.
+#
+# Roda uma vez por disparo do cq-backup.timer: o cq_backup.py acha o container do Postgres do
+# projeto pelos rótulos do Compose, gera o dump, cifra com a chave pública do age e poda os antigos.
+#
+# O marcador __CQ_OPERATOR__ é trocado pelo guia (docs/operacao/implantacao-vm.md, seção 10) pelo
+# usuário de operação da VM antes da instalação; a unidade não funciona com o marcador.
+#
+# Nada nesta unidade lê o arquivo de ambiente da pilha nem segredo algum: cada parâmetro da rotina
+# vem de uma Environment= abaixo, com valor fixo e público (o caminho da chave pública, não a privada).
+
+[Unit]
+Description=Backup cifrado do banco do canal-questoes
+Wants=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+User=__CQ_OPERATOR__
+Environment="CQ_BACKUP_PROJECT=cq"
+Environment="CQ_BACKUP_RECIPIENTS=/etc/cq-backup/recipients.txt"
+Environment="CQ_BACKUP_DUMPS_DIR=/var/backups/cq/dumps"
+Environment="CQ_BACKUP_STATE_DIR=/var/backups/cq/state"
+Environment="CQ_BACKUP_KEEP_DAYS=7"
+ExecStart=/usr/bin/python3 /srv/cq/app/ops/backup/cq_backup.py run --project ${CQ_BACKUP_PROJECT} --recipients ${CQ_BACKUP_RECIPIENTS} --dumps-dir ${CQ_BACKUP_DUMPS_DIR} --state-dir ${CQ_BACKUP_STATE_DIR} --keep-days ${CQ_BACKUP_KEEP_DAYS}
