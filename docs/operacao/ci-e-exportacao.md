@@ -170,6 +170,16 @@ perto do limite pede revisão do número de processos do pytest.
 
 Conferência: o tempo do `fast` está bem abaixo de 45 minutos, e o valor fica anotado para a monografia.
 
+**[passo do Pedro]** Conferir, no job `full`, o passo "Obter a imagem base do PL", que vem antes da suíte: ele lê a
+referência da linha `FROM` do `engine/Dockerfile` (o commit e o digest do PL) e baixa essa imagem. **[F]** Na primeira
+execução do `full` no repositório público (2026-11-19), o job ainda não tinha esse passo e saiu vermelho: os dois
+testes de sistema do motor (`test_engine_effective_isolation` e `test_engine_http_adapter_real_image`, em
+`tests/system/test_engine_system.py`) falharam com a mensagem de que a imagem base do PL não estava no host. Eles
+exigem a imagem já presente e não a baixam, de propósito. O passo entrou depois dessa execução.
+
+Conferência: o log do passo mostra a linha `imagem base do PL:` com a mesma referência do `engine/Dockerfile` e o
+download terminado sem erro; nenhum teste de sistema do motor falha por falta da imagem.
+
 **[passo do Pedro]** Ler o resumo da execução: ele lista as repetições únicas de instáveis conhecidos, se houve
 alguma. Uma falha que só aparece no Linux (a suíte nunca tinha rodado inteira em Linux) não é
 consertada às pressas no repositório público: ela vai à triagem de falhas (`scripts/run-suite-triage.py` e a

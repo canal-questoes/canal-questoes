@@ -3,7 +3,8 @@
 # - `fast`: em todo push (todas as branches), em pull request e à mão; a suíte sem os testes de sistema, em paralelo,
 #   por `ops/ci/ci_suite.py fast` (o mesmo passo da validação local, `ops/ci/validate_local.py`).
 # - `full`: na `main` e à mão; `ops/ci/ci_suite.py full` (a rápida e depois os testes de sistema, que constroem o motor
-#   a partir da imagem do PL).
+#   a partir da imagem do PL). Os testes de sistema do motor não baixam essa imagem: um passo antes da suíte a baixa,
+#   pela referência da linha `FROM` do `engine/Dockerfile`.
 # - No `fast`, o lint bloqueante (`ruff check`, com a configuração do `pyproject.toml`) antes da suíte; a suíte mede a
 #   cobertura do servidor e do cliente (`--coverage-xml`), o resumo dela vai para o resumo da execução e o
 #   `coverage.xml` vai para o Codecov.
@@ -201,7 +202,22 @@ jobs:
           uv run python scripts/fetch_age.py --platform linux-amd64 --dest "$RUNNER_TEMP/age"
           echo "CQ_TEST_AGE_DIR=$RUNNER_TEMP/age" >> "$GITHUB_ENV"
 
+      - name: Obter a imagem base do PL
+        # Os testes de sistema do motor (tests/system/test_engine_system.py) exigem a imagem base do PL já no host e não
+        # a baixam. A referência sai da primeira linha `FROM` do engine/Dockerfile, com o commit e o digest, e não é
+        # copiada para cá: uma troca da imagem no Dockerfile vale sozinha. A inspeção no fim repete a conferência do
+        # teste.
+        run: |
+          base="$(awk 'toupper($1) == "FROM" { print $2; exit }' engine/Dockerfile)"
+          case "$base" in
+            *@sha256:*) ;;
+            *) echo "engine/Dockerfile sem a imagem base do PL fixada por digest: '$base'" >&2; exit 1 ;;
+          esac
+          echo "imagem base do PL: $base"
+          docker pull "$base"
+          docker image inspect "$base" > /dev/null
+
       - name: Rodar a suíte inteira
         # A rápida em paralelo e depois os testes de sistema em série; os de sistema constroem o
-        # motor a partir da imagem do PL fixada no engine/Dockerfile (baixada aqui).
+        # motor a partir da imagem do PL fixada no engine/Dockerfile (baixada no passo anterior).
         run: uv run python ops/ci/ci_suite.py full
