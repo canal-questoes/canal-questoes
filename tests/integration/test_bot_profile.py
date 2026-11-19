@@ -277,6 +277,10 @@ def test_worker_configures_profile_with_exact_params(client: Any, clock: Any, bo
     with capture_logs() as cap:
         worker = bot_worker_thread()
         _wait(bot_api, worker, lambda: queue.get(tid).state == "done", "perfil configurado")
+        # A fila grava o `done` antes do registro `task.processed`: a captura só termina depois de ele chegar.
+        _wait(bot_api, worker, lambda: _processed(cap, tid), "registro task.processed")
+        # O worker para ainda dentro da captura: um erro registrado depois do `task.processed` também entra nela.
+        bot_worker_thread.stop_one(worker)
 
     calls = _profile_calls(bot_api, bot)
     assert _by_method(calls) == [("setMyCommands", {"commands": COMMANDS}),
@@ -494,6 +498,10 @@ def test_profile_exhausted_attempts_are_marked_failed_by_handler(client: Any, cl
         clock.advance(4)
         t_end = clock.now()
         _wait(bot_api, worker, lambda: queue.get(tid).state == "failed", "tentativas esgotadas")
+        # A fila grava o `failed` antes do registro `task.processed`: a captura só termina depois de ele chegar.
+        _wait(bot_api, worker, lambda: len(_processed(cap, tid)) >= 3, "registro task.processed")
+        # O worker para ainda dentro da captura: um registro feito depois do último `task.processed` também entra nela.
+        bot_worker_thread.stop_one(worker)
 
     assert t_end == t0 + timedelta(seconds=6)
     assert queue.get(tid) == _task(tid, state="failed", attempts=3, available_at=t_end,
@@ -678,6 +686,10 @@ def test_profile_worker_without_master_key_retries_then_fails(client: Any, clock
         clock.advance(4)
         t_end = clock.now()
         _wait(bot_api, worker, lambda: queue.get(tid).state == "failed", "tentativas esgotadas")
+        # A fila grava o `failed` antes do registro `task.processed`: a captura só termina depois de ele chegar.
+        _wait(bot_api, worker, lambda: len(_processed(cap, tid)) >= 3, "registro task.processed")
+        # O worker para ainda dentro da captura: um registro feito depois do último `task.processed` também entra nela.
+        bot_worker_thread.stop_one(worker)
 
     assert queue.get(tid) == _task(tid, state="failed", attempts=3, available_at=t_end, last_error=error,
                                    finished_at=t_end)

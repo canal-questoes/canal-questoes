@@ -13,3 +13,4 @@ tests/integration/test_dispatch_opening.py::test_media_blocked_by_403_blocks_the
 tests/integration/test_telegram_e2e.py::test_telegram_end_to_end_with_thirty_students
 tests/integration/test_answers_choice.py::test_tap_recorded_after_closes_at_waits_for_the_close_transition
 tests/integration/test_tokens_api.py::test_unauthenticated_matrix
+tests/integration/test_bot_profile.py::test_worker_configures_profile_with_exact_params
