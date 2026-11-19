@@ -475,6 +475,9 @@ def test_worker_crash_between_recording_and_grading_is_revived_by_the_sweep(worl
     [graded] = world.wait_submissions(delivery, 1)
     assert (graded["id"], graded["outcome"], graded["valid"], graded["score"], graded["late"]) == (
         pending["id"], "graded", True, 1.0, False)
+    # O worker grava a correção antes de concluir a tarefa: espera a rodada nova terminar antes de ler as tarefas.
+    world.wait_task("submission.grade", lambda t: t["id"] != grade["id"] and t["state"] in ("done", "failed"),
+                    what="a rodada nova da correção terminada")
     tasks = world.tasks("submission.grade")
     assert [(t["id"], t["state"]) for t in tasks] == [(grade["id"], "failed"), (tasks[1]["id"], "done")]
     assert tasks[1]["idempotency_key"] == f"submission.grade:{pending['id']}:r2"
@@ -529,6 +532,10 @@ def test_tap_on_the_unregistered_copy_counts_and_the_next_on_the_principal_is_al
     world.rich.fail("sendRichMessage", status=502, times=1, after_effect=True)
     world.confirm(off, dispatch)
     _until(lambda: [c for c in world.rich.calls("sendRichMessage") if c.outcome == "error"], what="o 5xx")
+    # O worker agenda a nova tentativa pelo relógio de quando registra a falha: o relógio só avança depois.
+    _until(lambda: world.sql.execute(
+        "SELECT count(*) FROM outbox_messages WHERE delivery_id IS NOT NULL AND state = 'pending' "
+        "AND attempts = 1").fetchone()[0] == 1, what="a nova tentativa da mensagem da questão agendada")
     world.advance(STEP)
     delivery = world.wait_delivery(dispatch, alice, "delivered")
     principal = world.principal(off, alice, delivery)
@@ -627,6 +634,9 @@ def test_close_task_failed_by_an_exhausted_lease_is_requeued_and_the_dispatch_cl
     _until(lambda: world.tasks("dispatch.close")[0]["state"] == "failed", what="a rodada r1 esgotada")
     world.advance(RETRY_GAP)
     world.wait_closed(dispatch)
+    # O worker fecha o disparo antes de concluir a tarefa: espera a última rodada terminar antes de ler as tarefas.
+    world.wait_task("dispatch.close", lambda t: t["id"] != close_task and t["state"] in ("done", "failed"),
+                    what="a última rodada do fechamento terminada")
     tasks = world.tasks("dispatch.close")
     assert (tasks[0]["id"], tasks[0]["state"]) == (close_task, "failed")
     assert tasks[1]["idempotency_key"] == f"dispatch.close:{row['id']}:r2"

@@ -11,10 +11,13 @@ segredos interpolados.
   **efetiva** do contêiner do motor (`docker inspect`), a versão do Docker Engine (≥ 26.0.0, ou ≥ 25.0.5
   na série 25, ou ≥ 23.0.11 na 23: a correção da CVE-2024-29018), uma **sonda local** numa rede não
   interna criada pelo teste (com a imagem do worker do próprio `build`, sem baixar nada) que o worker
-  alcança e o motor não; o motor não resolve nem alcança a api, o banco nem o gateway da rede interna;
-  sem rota padrão; o DNS embutido devolve SERVFAIL para nome externo (`.invalid`, RFC 6761) e para
-  `host.docker.internal`, com o controle positivo `engine` (NOERROR); os logs do motor sem identidade
-  nem segredo.
+  alcança e o motor não; o motor não resolve nem alcança a api, o banco nem o gateway da rede interna
+  (o `Gateway` do `inspect` ou, sem ele, no Engine ≥ 28, o primeiro endereço da sub-rede que nenhum
+  contêiner usa; nunca o de um contêiner), com o controle positivo na mesma rede (a porta fechada do
+  worker recusa); a ponte da rede interna sem endereço IPv4 do host (lida por um contêiner descartável
+  no espaço de rede do daemon, `--network host`, somente leitura e sem capacidades); sem rota padrão;
+  o DNS embutido devolve SERVFAIL para nome externo (`.invalid`, RFC 6761) e para `host.docker.internal`,
+  com o controle positivo `engine` (NOERROR); os logs do motor sem identidade nem segredo.
 - `test_engine_http_adapter_real_image`: o
   `exampleCourse` do PL (público, no commit fixado da imagem) é copiado para o volume `repos` por um
   contêiner descartável `--network none` e movido com `mv` atômico para `<sha256(repo)>/<commit>`, com o
@@ -37,6 +40,7 @@ logo no começo por isso (serviço ausente), antes de chamar o Docker.
 from __future__ import annotations
 
 import hashlib
+import ipaddress
 import json
 import os
 import pathlib
@@ -376,6 +380,38 @@ def _reach(stack: _Stack, service: str, plan: dict[str, list], *, engine: bool =
     return stack.py(service, script, engine=engine)
 
 
+# O endereço IPv4 de uma interface (SIOCGIFADDR), lido no espaço de rede do daemon (`--network host`):
+# `exists` diz se a interface existe; `ipv4` é None quando ela não tem endereço IPv4 (EADDRNOTAVAIL).
+_BRIDGE_SCRIPT = r'''
+import errno, fcntl, json, socket, struct, sys
+name = sys.argv[1]
+out = {"bridge": name, "exists": True, "ipv4": None, "error": None}
+try:
+    socket.if_nametoindex(name)
+except OSError as exc:
+    out.update(exists=False, error=type(exc).__name__)
+else:
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+        try:
+            raw = fcntl.ioctl(sock.fileno(), 0x8915, struct.pack("256s", name.encode("ascii")[:15]))
+            out["ipv4"] = socket.inet_ntoa(raw[20:24])
+        except OSError as exc:
+            out["error"] = errno.errorcode.get(exc.errno, str(exc.errno))
+print(json.dumps(out))
+'''
+
+
+def _bridge_ipv4(image: str, bridge: str) -> dict:
+    """Lê, num contêiner descartável no espaço de rede do daemon (somente leitura, sem capacidades, sem
+    contato externo), o endereço IPv4 da ponte `bridge`."""
+    result = _docker("run", "-i", "--rm", "--network", "host", "--read-only", "--cap-drop", "ALL",
+                     "--security-opt", "no-new-privileges:true", image, "python", "-I", "-", bridge,
+                     stdin=_BRIDGE_SCRIPT, timeout=COMMAND_TIMEOUT)
+    lines = [line for line in result.stdout.splitlines() if line.strip()]
+    assert lines, f"a leitura da ponte não imprimiu nada:\n{result.stderr[-2000:]}"
+    return json.loads(lines[-1])
+
+
 _ADAPTER_SCRIPT = r'''
 import dataclasses, json, os, urllib.error, urllib.request
 from collections.abc import Mapping
@@ -525,7 +561,30 @@ def test_engine_effective_isolation(engine_stack: _Stack) -> None:
     pg_ip = stack.inspect(stack.container("postgres"))["NetworkSettings"]["Networks"][DEFAULT_NETWORK]["IPAddress"]
     default_gateway = stack.inspect(DEFAULT_NETWORK)["IPAM"]["Config"][0]["Gateway"]
     ipam = engine_net["IPAM"]["Config"][0]
-    internal_gateway = ipam.get("Gateway") or re.sub(r"\.\d+/\d+$", ".1", ipam["Subnet"])
+    # O alvo do "gateway" da rede interna e os endereços dos contêineres dela (o motor e o worker).
+    engine_ip = networks[ENGINE_NETWORK]["IPAddress"]
+    worker_engine_ip = stack.inspect(worker_id)["NetworkSettings"]["Networks"][ENGINE_NETWORK]["IPAddress"]
+    endpoint_ips = {ep["IPv4Address"].split("/")[0]
+                    for ep in (stack.inspect(ENGINE_NETWORK).get("Containers") or {}).values()}
+    if ipam.get("Gateway"):
+        internal_gateway = ipam["Gateway"]  # Engine < 28: reservado, e fora da ponte pelo `inhibit_ipv4`
+    else:
+        # Engine >= 28 (moby/moby#49261): `internal` com `inhibit_ipv4` não reserva gateway, e o `.1` pode ser de
+        # um contêiner da rede; o alvo é o primeiro endereço da sub-rede que nenhum contêiner usa.
+        assert int(re.match(r"\d+", version).group()) >= 28, ("rede do motor sem gateway num Engine < 28", version,
+                                                              ipam)
+        internal_gateway = next(str(a) for a in ipaddress.ip_network(ipam["Subnet"]).hosts()
+                                if str(a) not in endpoint_ips)
+    isolation = {"docker": version, "subnet": ipam["Subnet"], "gateway": ipam.get("Gateway"),
+                 "target": internal_gateway, "containers": sorted(endpoint_ips)}
+    assert {engine_ip, worker_engine_ip} <= endpoint_ips, ("os contêineres da rede do motor", engine_ip,
+                                                           worker_engine_ip, isolation)
+    assert internal_gateway not in endpoint_ips, ("o alvo do gateway é endereço de contêiner", isolation)
+    # O host não tem endereço IPv4 na ponte da rede interna (o `inhibit_ipv4`), em qualquer versão do Engine.
+    bridge = engine_net["Options"].get("com.docker.network.bridge.name") or f"br-{engine_net['Id'][:12]}"
+    bridge_ipv4 = _bridge_ipv4(worker_image, bridge)
+    assert bridge_ipv4 == {"bridge": bridge, "exists": True, "ipv4": None, "error": "EADDRNOTAVAIL"}, (
+        "a ponte da rede do motor tem endereço IPv4 do host", bridge_ipv4, isolation)
     assert all([probe_ip, api_ip, pg_ip, default_gateway, internal_gateway])
 
     # 4. Controles positivos, no worker: a sonda, o motor e a recusa do gateway da `default`.
@@ -558,6 +617,7 @@ def test_engine_effective_isolation(engine_stack: _Stack) -> None:
         "connect_postgres": ["connect", pg_ip, 5432],
         "gateway_api_port": ["connect", internal_gateway, stack.port],
         "gateway_closed": ["connect", internal_gateway, CLOSED_PORT],
+        "neighbor_closed": ["connect", worker_engine_ip, CLOSED_PORT],
         "routes": ["routes"],
         "dns_external": ["dns", external],
         "dns_host": ["dns", "host.docker.internal"],
@@ -566,8 +626,11 @@ def test_engine_effective_isolation(engine_stack: _Stack) -> None:
     for key in ("resolve_probe", "resolve_api", "resolve_postgres"):
         assert engine[key]["ok"] is False, (key, engine[key])
     for key in ("connect_probe", "connect_api", "connect_postgres", "gateway_api_port", "gateway_closed"):
-        assert engine[key]["reached"] is False, (f"o motor alcançou {key}", engine[key])
-        assert engine[key]["error"] not in (None, "ConnectionRefusedError"), engine[key]
+        assert engine[key]["reached"] is False, (f"o motor alcançou {key}", engine[key], isolation)
+        assert engine[key]["error"] not in (None, "ConnectionRefusedError"), (engine[key], isolation)
+    assert engine["neighbor_closed"] == {"reached": True, "error": "ConnectionRefusedError"}, (
+        "controle do método na rede interna: a porta fechada do worker precisa recusar", engine["neighbor_closed"],
+        isolation)
     assert "00000000" not in engine["routes"], f"o motor tem rota padrão: {engine['routes']}"
     assert engine["dns_external"] == {"rcode": SERVFAIL}, engine["dns_external"]
     assert engine["dns_host"] == {"rcode": SERVFAIL}, engine["dns_host"]
