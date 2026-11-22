@@ -11,8 +11,8 @@ authors:
   - given-names: "Pedro"
     family-names: "Ribeiro"
     affiliation: "Instituto de Computação, Universidade Estadual de Campinas (Unicamp)"
-version: "0.1.0"
-date-released: "2026-11-16"
+version: "0.1.1"
+date-released: "2026-11-22"
 license: AGPL-3.0-or-later
 repository-code: "https://github.com/canal-questoes/canal-questoes"
 keywords:

@@ -525,6 +525,8 @@ def test_archive_revokes_student_and_team_invites_and_cancels_queued_sends(
         _worker(bot_worker_thread, settings, verification=mail_channel)
         _wait(lambda: [s["state"] for s in _sends(sql, offering)][2:] == ["cancelled", "cancelled"]
               and len(_invite_email_records(cap)) == 2, "os envios da fila não foram cancelados")
+        # O tratador registra o `invite.email` antes de concluir a tarefa: espera nenhuma tarefa em posse antes de ler.
+        _wait(lambda: all(row[1] != "leased" for row in _invite_tasks(sql)), "as tarefas invite.email não terminaram")
 
     assert _sends(sql, offering) == [
         _send(batch_a, state="sent", attempts=1, finished_at=t0),

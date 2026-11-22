@@ -1712,6 +1712,10 @@ def test_tap_recorded_after_closes_at_waits_for_the_close_transition(make_env: A
     closed = env.delivery(dispatch, student)
     assert closed["state"] == "no_answer" and closed["revealed_at"] is None
     assert env.submissions(delivery) == []
+    # O worker grava o update processado antes de concluir a rodada: espera nenhuma rodada em posse antes de ler.
+    env.wait(lambda: env.sql.execute("SELECT count(*) FROM tasks WHERE task_type = 'telegram.update' "
+                                     "AND payload @> %s::jsonb AND state = 'leased'",
+                                     (update_payload,)).fetchone()[0] == 0)
     rounds = env.sql.execute("SELECT state FROM tasks WHERE task_type = 'telegram.update' AND payload @> %s::jsonb "
                              "ORDER BY id", (update_payload,)).fetchall()
     assert len(rounds) >= 2 and all(r[0] == "done" for r in rounds)

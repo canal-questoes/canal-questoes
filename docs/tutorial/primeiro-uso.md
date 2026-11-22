@@ -318,7 +318,8 @@ docker image ls
 ```
 
 O `-v` apaga os volumes, e o `--rmi local` apaga as imagens sem nome próprio no `compose.yaml`, que são as da `api`, do
-`worker` e do `engine` [I]. O `docker volume ls` não deve mostrar mais os volumes do projeto `cq`, e o
+`worker` e do `engine`. O `-p cq` é o nome do projeto do Compose, o mesmo que o `cq down` mostra; se o seu perfil tem
+outro `compose_project`, use esse nome no `-p`. O `docker volume ls` não deve mostrar mais os volumes do projeto, e o
 `docker image ls`, as imagens dele. A imagem do PostgreSQL, baixada pronta, fica; apague-a com `docker image rm`, se
 não for usá-la.
 
@@ -334,11 +335,12 @@ Por fim, fora do sistema:
 
 | Sintoma | O que fazer |
 | --- | --- |
+| A página [Senhas de app](https://myaccount.google.com/apppasswords) diz que a configuração não está disponível para a sua conta, ou pede para confirmar a sua identidade e não passa disso | ligue a verificação em duas etapas da Conta do Google e volte à página. Pela [ajuda do Google sobre senhas de app](https://support.google.com/accounts/answer/185833), a opção também falta quando a verificação usa só chaves de segurança, numa conta de trabalho, escolar ou de outra organização e numa conta com a Proteção Avançada. Se a página continuar recusando, use outra conta ou outro provedor de e-mail: uma conta criada há poucos dias pode não passar da confirmação de identidade [I] |
 | O `cq up` diz que falta uma variável no arquivo de ambiente | preencha a variável no `.env` (passo 2) |
 | O `cq up`, o `cq status` ou o `cq doctor` mostram o `worker` parado ou com falha (ou o aviso de e-mail não testado não some) | veja `cq logs --service worker`: uma configuração inválida aparece com a variável `CQ_*` a corrigir (por exemplo, uma das `CQ_SMTP_*`), sem o valor; corrija o `.env` e rode `cq down` e `cq up` |
 | O `cq up` diz que a porta da API já está em uso | outro processo usa a porta 8000: ponha outra porta em `CQ_API_PORT` no `.env` e a mesma no `api_url` do perfil, e rode `cq down` e `cq up` |
 | O `cq up` diz que o Docker não está disponível | abra o Docker Desktop (Windows) ou inicie o serviço do Docker (Linux) |
-| Os comandos da API dizem `Token ausente, inválido ou revogado.` | o `token` do perfil não é o valor de `CQ_ADMIN_TOKEN` do `.env` |
+| Os comandos da API dizem `Token ausente, inválido ou revogado.`, ou o `cq doctor` diz `Sem acesso à parte da API: token recusado.` | o `token` do perfil não é o valor de `CQ_ADMIN_TOKEN` do `.env` |
 | O `bots register` é recusado | se a mensagem fala da chave-mestra dos bots, confira `CQ_MASTER_KEY` no `.env` e reinicie a pilha com `cq down` e `cq up`; se a saída aponta o `token`, confira o token copiado do BotFather |
 | O `students summary` mostra o convite em "falha no envio" | confira as `CQ_SMTP_*`, reinicie a pilha com `cq down` e `cq up` e veja `cq doctor` e `cq logs --service worker`; depois, rode de novo o `cq invites send prepare` e o `cq invites send confirm` |
 | O `cq doctor` diz que o servidor de e-mail recusou a autenticação | confira `CQ_SMTP_USERNAME` e `CQ_SMTP_PASSWORD`; com o Gmail, tente a senha de app sem os espaços entre os grupos [I] |
