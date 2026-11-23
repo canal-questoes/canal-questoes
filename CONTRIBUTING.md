@@ -53,6 +53,7 @@ export CQ_TEST_AGE_DIR=<a mesma pasta>  # os testes do age falham sem ela (estã
 bash scripts/test-postgres.sh up       # o Postgres descartável dos testes, em 127.0.0.1:55432
 uv run pytest -q tests/unit            # uma parte da suíte Python
 uv run python ops/ci/ci_suite.py fast  # a suíte rápida do CI (sem os testes de sistema)
+docker pull "$(awk 'toupper($1) == "FROM" { print $2; exit }' engine/Dockerfile)"  # a imagem base do PL
 bash scripts/run-suite.sh              # a suíte Python inteira, por diretório, com os testes de sistema
 bash scripts/run-engine-suite.sh       # o motor e a conformidade com o PrairieLearn
 bash scripts/test-postgres.sh down     # derruba o Postgres de teste
@@ -63,6 +64,11 @@ uv run ruff check server/src client/src ops scripts   # o lint, com a versão do
   confere que a identidade dos alunos não vaza) e `system/` (sobe o Docker Compose de verdade).
 - `SYSTEM=0 bash scripts/run-suite.sh` pula os testes de sistema; `CQ_SUITE_WORKERS` muda o número de processos
   (padrão: 4) e `CQ_SUITE_OUT`, a pasta das saídas.
+- Os testes de sistema do motor (`tests/system/test_engine_system.py`) exigem a imagem base do PrairieLearn já no
+  host e não a baixam: sem ela, eles falham (não são pulados). O `docker pull` do bloco acima baixa a imagem da
+  primeira linha `FROM` do `engine/Dockerfile`, fixada pelo commit e pelo digest, como o CI faz antes da suíte
+  inteira. Faça isso uma vez, antes da primeira suíte inteira, e de novo quando o `engine/Dockerfile` trocar a imagem.
+  Com `SYSTEM=0`, esses testes ficam de fora com os outros de sistema.
 - Alguns testes usam o binário `age`, e sem `CQ_TEST_AGE_DIR` eles falham (não são pulados). Eles só rodam em
   x86-64, no Linux ou no Windows; noutras máquinas (um Mac ou uma máquina ARM, por exemplo) esses testes falham. O
   `scripts/fetch_age.py` baixa a versão fixada do `age` e confere o SHA-256 dela; no Python nativo do Windows, use

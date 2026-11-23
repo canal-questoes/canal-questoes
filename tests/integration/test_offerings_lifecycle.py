@@ -183,6 +183,14 @@ def _wait_profile(client: Any, bot_api: Any, ref: str, profile_state: str) -> No
                      timeout=10)
 
 
+def _wait_profile_tasks_finished(bot_api: Any, sql: psycopg.Connection) -> None:
+    """O worker grava o perfil antes de concluir a tarefa `bot.sync_profile`: antes de um salto do relógio maior que a
+    posse da tarefa, espera nenhuma tarefa do perfil pendente ou em posse (senão a posse vence e a tarefa é refeita).
+    O `pending` entra de propósito: uma tarefa ainda por tomar também correria depois do salto."""
+    bot_api.wait_for(lambda: sql.execute("SELECT count(*) FROM tasks WHERE task_type = 'bot.sync_profile' "
+                                         "AND state IN ('pending', 'leased')").fetchone()[0] == 0, timeout=10)
+
+
 UPDATE_COLUMNS = ("update_epoch", "update_id", "kind", "chat_id", "chat_type", "sender_id", "text", "command",
                   "details", "received_at", "state", "outcome", "processed_at")
 
@@ -271,6 +279,7 @@ def test_close_keeps_the_bot_polled(client: Any, clock: Any, sql: psycopg.Connec
     bot_worker_thread(settings=_worker_settings(settings))
     _wait_polled(bot_api, tg)
     _wait_profile(client, bot_api, ref, "configured")
+    _wait_profile_tasks_finished(bot_api, sql)
     cursor = _last_seq(client)
 
     clock.advance(60)
@@ -445,6 +454,7 @@ def test_confirm_archives_releases_lease_stops_polling_and_revokes_links(
     for telegram_bot_id, offering_ref in ((tg, ref), (tw, witness["code"])):
         _wait_polled(bot_api, telegram_bot_id)
         _wait_profile(client, bot_api, offering_ref, "configured")
+    _wait_profile_tasks_finished(bot_api, sql)
 
     clock.advance(60)
     t2 = clock.now()

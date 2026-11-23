@@ -10,6 +10,40 @@ coisa pode mudar de uma versão para a outra.
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-11-22
+
+Versão de correção, só de documentação e de testes: o tutorial de primeiro uso, depois de seguido de ponta a ponta, o
+guia de contribuição e testes que falhavam de vez em quando por uma corrida ou uma folga de medição do próprio teste.
+O funcionamento do sistema não muda; muda só o número da versão que ele mostra.
+
+### Corrigido
+
+- **Tutorial de primeiro uso**, depois de seguido de ponta a ponta com um bot real, uma conta real do Telegram e um
+  SMTP real:
+  - a tabela "Quando algo dá errado" ganhou a linha da página de senhas de app do Google que recusa a conta (a opção
+    indisponível ou a confirmação de identidade que não passa), com os motivos da ajuda do Google e a saída por outra
+    conta ou outro provedor de e-mail;
+  - a linha do token recusado cita também a mensagem do `cq doctor`, que é outra;
+  - a limpeza explica que o `-p cq` é o projeto do Compose que o `cq down` mostra, a trocar quando o perfil tem outro
+    `compose_project`, e deixa de marcar como inferência que o `--rmi local` apaga as imagens da `api`, do `worker` e
+    do `engine`.
+- **Guia de contribuição:** a seção "Testes" manda baixar a imagem base do PrairieLearn, a da primeira linha `FROM`
+  do `engine/Dockerfile`, antes da suíte inteira, como o CI já faz. Sem ela, os testes de sistema do motor falham.
+- **Testes que falhavam de vez em quando**, sem mudar o que eles conferem:
+  - seis testes de integração liam o banco antes de o worker concluir a tarefa, ou andavam o relógio falso além da
+    espera de uma nova tentativa; agora esperam o fim da tarefa ou dão um passo menor;
+  - os dois casos do erro 429 nos testes de falhas de entrega do Telegram usam a folga de medição dos outros testes
+    de ritmo, porque, numa máquina carregada, o agendamento das threads encolhia o intervalo medido.
+
+### Modificado
+
+- **Número da versão:** os pacotes `cq-server` e `cq-client` e o plugin do Claude Code passam a 0.1.1, e é esse o
+  número que a saúde da API (`GET /health`, `cq health` e `cq status`) e o servidor MCP mostram.
+- **Lista de testes instáveis do CI** (`ops/ci/known-flaky.txt`): ganhou 27 testes: 24 que medem o tempo de parede
+  (entre eles, os dois casos do 429) e três com uma corrida do próprio teste, provada ou suspeita (dois deles
+  corrigidos acima). Quando todas as falhas de uma suíte são da lista, o CI repete só esses testes uma vez, e a
+  repetição decide.
+
 ## [0.1.0] - 2026-11-16
 
 Primeira versão pública.

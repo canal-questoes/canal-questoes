@@ -706,6 +706,9 @@ def test_engine_down_at_grading_keeps_submission_grading_notifies_once_and_retri
     world.engine_fake.start()
     world.advance(RETRY_GAP)
     [graded] = world.wait_submissions(delivery, 1)
+    # O worker grava a correção antes de concluir a tarefa: espera a rodada nova terminar antes de ler as tarefas.
+    world.wait_task("submission.grade", lambda t: t["id"] != first["id"] and t["state"] in ("done", "failed"),
+                    what="a rodada nova da correção terminada")
     tasks = world.tasks("submission.grade")
     assert [t["state"] for t in tasks] == ["failed", "done"]
     assert tasks[1]["idempotency_key"] == f"submission.grade:{pending['id']}:r2"

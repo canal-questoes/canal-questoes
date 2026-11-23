@@ -25,7 +25,13 @@ Telegram desses workers é maior (8 s, dentro do invariante da posse) para o gan
 Tempo: as esperas da fila andam no `FakeClock`; o ritmo (`SendPacer`) usa o relógio monotônico
 real e é medido nos `started`/`ended` da Bot API falsa (`perf_counter`). A folga `PACE_TOLERANCE`
 cobre só a medição: o limitador lê o `time.monotonic()` (grão de 15,6 ms no Windows) na posse, e o
-dublê marca a chegada do pedido HTTP.
+dublê marca a chegada do pedido HTTP. Nos dois casos do 429, o ritmo (`_assert_pace`) usa a folga
+`RETRY_PACE_TOLERANCE`, a mesma dos outros testes de ritmo (`test_telegram_e2e.py`, `test_telegram_timing.py`):
+entre a liberação pelo limitador e a chegada ao dublê, o agendamento das threads de uma máquina carregada
+encolhe o intervalo medido; o valor exato do intervalo é o dos testes do limitador com o relógio injetado
+(`tests/unit/test_pacing.py`). A espera do `retry_after` continua com `PACE_TOLERANCE`: o dublê marca o `ended`
+antes de escrever a resposta, e o `penalize` lê o relógio depois de recebê-la, então o atraso de agendamento só
+alonga essa medida.
 
 No esqueleto, toda função falha no primeiro
 `dispatches.prepare` (rota ausente, 404). Cada caso passa quando existir a parte de que depende, entre as
@@ -85,6 +91,7 @@ RETRY_AFTER = 2  # segundos do `retry_after` programado
 CHAT_INTERVAL = 1.0  # DeliverySettings().chat_interval_seconds
 BOT_PER_SECOND = 30  # DeliverySettings().bot_per_second
 PACE_TOLERANCE = 0.05  # só a medição (ver o docstring)
+RETRY_PACE_TOLERANCE = 0.2  # a folga dos outros testes de ritmo, no `_assert_pace` dos dois casos do 429 (docstring)
 HOOK_WAIT = 6.0  # quanto o gancho segura a edição em voo (menor que o prazo do Telegram de 8 s)
 SEND_METHODS = ("sendMessage", "sendRichMessage", "sendPhoto", "sendDocument")
 EDIT_METHODS = ("editMessageText", "editMessageReplyMarkup")
@@ -454,20 +461,20 @@ def _delivery_event(off: _Offering, dispatch: dict, delivery: dict, student: _St
             "delivery_id": delivery["delivery_id"], "person": student.pseudo_id, **extra}
 
 
-def _assert_pace(rich: Any, bot: int) -> None:
+def _assert_pace(rich: Any, bot: int, tolerance: float = PACE_TOLERANCE) -> None:
     """por chat, chamadas de envio e de edição separadas por pelo menos 1 s; por bot, no máximo
-    30 em qualquer janela de 1 s (medidas no `started` da Bot API falsa; folga só de medição)."""
+    30 em qualquer janela de 1 s (medidas no `started` da Bot API falsa; folga `tolerance`, só de medição)."""
     calls = [c for c in rich.calls(bot_id=bot) if c.method in PACED_METHODS]
     by_chat: dict[str, list[float]] = {}
     for call in calls:
         by_chat.setdefault(str(call.params.get("chat_id")), []).append(call.started)
     for starts in by_chat.values():
         gaps = [b - a for a, b in itertools.pairwise(starts)]
-        assert all(gap >= CHAT_INTERVAL - PACE_TOLERANCE for gap in gaps), (
+        assert all(gap >= CHAT_INTERVAL - tolerance for gap in gaps), (
             f"ritmo por chat acima do limite: {[round(g, 3) for g in gaps]}")
     starts = sorted(c.started for c in calls)
     for i, start in enumerate(starts):
-        window = [s for s in starts[i:] if s < start + 1.0 - PACE_TOLERANCE]
+        window = [s for s in starts[i:] if s < start + 1.0 - tolerance]
         assert len(window) <= BOT_PER_SECOND
 
 
@@ -538,7 +545,7 @@ def test_429_on_the_question_waits_at_least_retry_after_and_keeps_the_pace(world
     assert [c.outcome for c in sends[:2]] == ["error", "ok"]
     assert sends[1].started - sends[0].ended >= RETRY_AFTER - PACE_TOLERANCE
     _until(lambda: world.prompts(off, alice), what="o pedido do campo")
-    _assert_pace(world.rich, off.bot)
+    _assert_pace(world.rich, off.bot, RETRY_PACE_TOLERANCE)
 
 
 @pytest.mark.parametrize("failure", ["429", "5xx"])
@@ -570,7 +577,7 @@ def test_429_and_5xx_on_an_edit_are_retried_and_the_edit_is_applied(world: _Worl
     if failure == "429":
         assert later[0].started - failed.ended >= RETRY_AFTER - PACE_TOLERANCE
     assert [m for m in world.delivery_messages(delivery) if m["delivery_role"] == "fallback"] == []
-    _assert_pace(world.rich, off.bot)
+    _assert_pace(world.rich, off.bot, RETRY_PACE_TOLERANCE if failure == "429" else PACE_TOLERANCE)
 
 
 def test_5xx_on_the_question_is_retried_and_delivered_once(world: _World) -> None:

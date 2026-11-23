@@ -24,7 +24,8 @@ Horários pelo `FakeClock`, em minutos inteiros sempre que o e-mail os mostra (a
 `HH:MM`); o `Date` do e-mail e a meta de 5 s em tempo real. Ids internos, códigos e pseudônimos nunca como
 literal: são lidos do banco e do SMTP falso e comparados por relação. Com o worker no ar, o relógio
 anda 60 s por vez: passa as esperas de 2 s e de 4 s das repetições e a posse de 30 s das tarefas, em
-minutos inteiros; a posse dos bots é renovada mesmo vencida, sem evento (`bots.renew_leases`).
+minutos inteiros; a posse dos bots é renovada mesmo vencida, sem evento (`bots.renew_leases`). A exceção é o
+encerramento depois de uma falha temporária, que vem antes de a nova tentativa ficar devida (um salto de 1 s).
 """
 
 from __future__ import annotations
@@ -941,7 +942,10 @@ def test_offering_closed_after_a_temporary_failure_cancels_with_the_codes_genera
         digest = _digest_of_unknown(invites, 0)
         assert _invite_view(invites) == [_invite(sid, pseudo, digest, "pending", t_send)]
         _settle(smtp, sql)
-        t_close = clock.advance(STEP)
+        # O encerramento vem antes de a nova tentativa ficar devida: um salto menor que a espera dela, e não o `STEP`,
+        # senão o worker pode reenviar antes de o encerramento valer (o salto fica abaixo da posse de 30 s).
+        t_close = clock.advance(FIRST_RETRY_WAIT.total_seconds() / 2)
+        assert t_close < t_send + FIRST_RETRY_WAIT
         ref = offering["code"]
         current = _ok(client.get(f"/v1/offerings/{ref}", headers=auth(ADMIN_TOKEN)), "offerings.get")
         closed = _ok(client.post(f"/v1/offerings/{ref}/close", headers=auth(ADMIN_TOKEN)), "offerings.close")
