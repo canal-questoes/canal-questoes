@@ -46,8 +46,9 @@
 # Motor (engine): o código Python das questões roda no motor, com o mesmo usuário (65534) do Node e dos
 # outros executores. Por isso ele fica só na rede interna `engine` (sem saída e sem
 # acesso ao gateway do host, com `inhibit_ipv4`), sem porta, só leitura, sem capacidades, com limites e
-# com o volume `repos` só para leitura. Exige Docker Engine >= 26.0.0 (ou 25.0.5 / 23.0.11), com a
-# correção da CVE-2024-29018 (DNS de rede interna). Os logs do contêiner do motor são SENSÍVEIS (o
+# com o volume `repos` só para leitura. Exige Docker Engine >= 26.0.2 (ou 25.0.5 / 23.0.11), com as
+# correções da CVE-2024-29018 (DNS de rede interna) e da CVE-2024-32473 (IPv6 ligado nas interfaces de
+# redes só IPv4, no 26.0.0 e no 26.0.1). Os logs do contêiner do motor são SENSÍVEIS (o
 # código da questão pode escrever neles): têm rotação curta (1 MiB x 2) e não são coletados por nenhuma
 # saída do sistema. Riscos residuais aceitos no TCC:
 # o código de uma questão pode ler o /repos inteiro, o /proc dos pedidos simultâneos (com respostas de

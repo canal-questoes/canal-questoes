@@ -102,7 +102,9 @@ CATALOG_ENTRIES = {
 # O `system.health` da API base, que o CLI não muda (inclusive o motivo congelado do `mcp.exposed: false`).
 SYSTEM_HEALTH_ENTRY = {"id": "system.health", "method": "GET", "path": "/health", "permission": None,
                        "cli": "health",
-                       "mcp": {"exposed": False, "reason": "Operação de diagnóstico; o doctor decide."},
+                       "mcp": {"exposed": False,
+                               "reason": ("Operação de diagnóstico; no MCP, o diagnóstico fica com a "
+                                          "run_doctor, e a stack_status mostra a saúde da API da pilha local.")},
                        "destructive": False}
 
 _UUID = {"type": "string", "pattern": UUID4_PATTERN}

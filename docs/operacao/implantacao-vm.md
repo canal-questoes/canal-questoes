@@ -214,9 +214,10 @@ sessão de reserva. Daqui em diante, todo comando de `bash` roda como `<operador
 
 ## 4. Docker Engine e Compose
 
-Versões mínimas: Docker Engine **26.0.0** (a correção da CVE-2024-29018 no DNS da rede interna do motor, citada no
-cabeçalho do `compose.yaml`) e Compose **2.27.0** (o mínimo sem aviso do `cq doctor`). O Docker vem do repositório
-oficial da Docker, não do pacote `docker.io` do Ubuntu.
+Versões mínimas: Docker Engine **26.0.2** e Compose **2.27.0** (o mínimo sem aviso do `cq doctor`). O 26.0.2 traz as
+duas correções citadas no cabeçalho do `compose.yaml`: a da CVE-2024-29018, no DNS da rede interna do motor, que veio
+no 26.0.0, e a da CVE-2024-32473, a falha do 26.0.0 e do 26.0.1 que deixa o IPv6 ligado nas interfaces de redes só
+IPv4. O Docker vem do repositório oficial da Docker, não do pacote `docker.io` do Ubuntu.
 
 **[comando pronto]** Instalar pelo repositório oficial (**[I]** os passos da página "Install Docker Engine on Ubuntu"
 de docs.docker.com; confira lá antes de colar):
@@ -235,7 +236,7 @@ sudo usermod -aG docker <operador>
 
 Saia e entre de novo no SSH para o grupo `docker` valer.
 
-Conferência: `docker version --format '{{.Server.Version}}'` mostra 26.0.0 ou mais; `docker compose version` mostra
+Conferência: `docker version --format '{{.Server.Version}}'` mostra 26.0.2 ou mais; `docker compose version` mostra
 2.27.0 ou mais; `docker run --rm hello-world` termina com "Hello from Docker!".
 
 ## 5. Pacote do sistema

@@ -1,9 +1,9 @@
 # Princípios do canal-questoes
 
 Os sete princípios que guiam o desenvolvimento do canal-questoes e as restrições técnicas do projeto. Este documento é
-derivado do documento interno de princípios do projeto (a versão 1.0.0, ratificada em 24/09/2026), que continua sendo
-a fonte, e é conferido contra ele antes de cada versão publicada, como manda o guia de
-[publicação de versões](../operacao/publicacao-de-versoes.md).
+derivado do documento interno de princípios do projeto (a versão 1.0.1, ratificada em 24/09/2026 e emendada em
+24/11/2026), que continua sendo a fonte, e é conferido contra ele antes de cada versão publicada, como manda o guia
+de [publicação de versões](../operacao/publicacao-de-versoes.md).
 
 Dois princípios são marcados como **não negociáveis**: o segundo, sobre os testes, e o terceiro, sobre a identidade
 dos alunos. Para o resumo em uma linha de cada princípio, veja o [`AGENTS.md`](../../AGENTS.md); para as regras
@@ -87,6 +87,9 @@ Justificativa: a correção é o núcleo de valor do sistema, e divergências si
 - O núcleo não depende diretamente de Telegram, PrairieLearn, git, e-mail ou HTTP. Toda dependência externa entra por
   uma porta, como `QuestionEngine` (o motor de questões), `DeliveryChannel` (a entrega ao aluno),
   `VerificationChannel` (o convite por e-mail) e `ReportRenderer` (o relatório).
+  - O provisionamento de bots é hoje parte da porta do Telegram: o operador cola à mão o token criado no BotFather, e
+    o sistema o confere e configura o bot por essa porta. Uma porta própria, `BotProvisioner`, é a evolução prevista
+    para os bots gerenciados do Telegram.
 - Os canais declaram as suas capacidades; o núcleo nunca testa "qual canal é".
 - O banco de questões é opaco: o sistema só recebe referências (repositório, commit e identificador da questão).
 - A representação intermediária entre o motor e o canal e a API são **contratos versionados**, em

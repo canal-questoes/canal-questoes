@@ -3,6 +3,8 @@
 # Uso: scripts/check-frozen-tests.sh <dir com testes.sha256>
 # Falha se: um hash não confere; a lista de arquivos rastreados mudou; há arquivo novo, alterado ou
 # não rastreado nos caminhos congelados.
+# A lista dos testes do motor (caminhos em engine/) confere-se com scripts/check-frozen-engine-tests.sh, que tem os
+# caminhos congelados do motor; com ela, este script para com o código 2 e aponta o outro.
 set -euo pipefail
 
 SPEC_DIR="${1:?informe o diretório com o testes.sha256}"
@@ -13,6 +15,10 @@ GLOBS=('tests/*' 'contracts/api/v1/*' pytest.ini)
 sha256sum -c --quiet "${HASHES}"
 
 expected="$(awk '{f=$2; sub(/^*/, "", f); print f}' "${HASHES}" | sort)"
+if grep -q '^engine/' <<< "${expected}"; then
+  echo "${HASHES} é a lista dos testes do motor: confira com scripts/check-frozen-engine-tests.sh ${SPEC_DIR}" >&2
+  exit 2
+fi
 # Os contratos do CLI entram nos caminhos congelados só quando o arquivo de hashes cita
 # algum arquivo sob contracts/cli/v1/; os demais caminhos continuam fixos.
 if grep -q '^contracts/cli/v1/' <<< "${expected}"; then

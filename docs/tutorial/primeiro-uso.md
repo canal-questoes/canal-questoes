@@ -17,8 +17,8 @@ documentação, veja o [README da documentação](../README.md).
 
 - **Linux**, com o Docker Engine e o plugin do Compose, ou **Windows**, com o Docker Desktop sobre o WSL 2. Outros
   sistemas não foram conferidos.
-- O Docker Engine 26.0.0 ou mais novo (ou as versões corrigidas 25.0.5 e 23.0.11), por causa de uma correção de
-  segurança na rede interna que isola o motor de questões. O Compose 2.27 ou mais novo: com uma versão anterior, o
+- O Docker Engine 26.0.2 ou mais novo (ou as versões corrigidas 25.0.5 e 23.0.11), por causa de duas correções de
+  segurança de rede do Docker, que valem para a rede interna que isola o motor de questões. O Compose 2.27 ou mais novo: com uma versão anterior, o
   diagnóstico do `cq` mostra um aviso.
 - O `git` e o `uv`, que instala o `cq` com o Python 3.12.
 - Alguns gigabytes livres em disco: o motor de questões é construído sobre a imagem do PrairieLearn.
