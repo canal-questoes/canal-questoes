@@ -84,7 +84,9 @@ HTTP_METHODS = ("get", "put", "post", "delete", "options", "head", "patch", "tra
 EXPECTED_OPERATIONS: dict[str, dict] = {
     "system.health": {
         "method": "GET", "path": "/health", "permission": None, "cli": "health",
-        "mcp": {"exposed": False, "reason": "Operação de diagnóstico; o doctor decide."},
+        "mcp": {"exposed": False,
+                "reason": ("Operação de diagnóstico; no MCP, o diagnóstico fica com a run_doctor, e a "
+                           "stack_status mostra a saúde da API da pilha local.")},
         "destructive": False,
     },
     "people.register": {

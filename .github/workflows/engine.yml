@@ -5,8 +5,9 @@
 # terceiros.
 #
 # O job cria o oráculo (`pl-oracle`, a imagem do PL fixada por commit e digest, a mesma do engine/Dockerfile) e chama
-# `scripts/run-engine-suite.sh`, que constrói as imagens, roda os testes na imagem restrita, a conformidade contra o
-# oráculo e confere o congelamento dos testes do motor.
+# `scripts/run-engine-suite.sh`, que constrói as imagens, roda os testes na imagem restrita e a conformidade contra o
+# oráculo. A conferência do congelamento dos testes do motor só roda no repositório de origem, que guarda a lista dos
+# hashes; na cópia pública, o script pula esse passo.
 #
 # [I] A conformidade roda com o `node` do runner e precisa de um Node que leia TypeScript (`node --test` sobre `.ts`;
 # o motor foi validado com o Node 24). Sem uma ação de instalação do Node

@@ -9,7 +9,7 @@
       "cli": "health",
       "mcp": {
         "exposed": false,
-        "reason": "Operação de diagnóstico; o doctor decide."
+        "reason": "Operação de diagnóstico; no MCP, o diagnóstico fica com a run_doctor, e a stack_status mostra a saúde da API da pilha local."
       },
       "destructive": false
     },

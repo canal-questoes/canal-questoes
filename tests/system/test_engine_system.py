@@ -8,8 +8,9 @@ congelado), com segredos gerados no teste e `.env` vazio, no molde do `_Stack` d
 segredos interpolados.
 
 - `test_engine_effective_isolation` (os 7 passos da verificação de isolamento): a configuração
-  **efetiva** do contêiner do motor (`docker inspect`), a versão do Docker Engine (≥ 26.0.0, ou ≥ 25.0.5
-  na série 25, ou ≥ 23.0.11 na 23: a correção da CVE-2024-29018), uma **sonda local** numa rede não
+  **efetiva** do contêiner do motor (`docker inspect`), a versão do Docker Engine (≥ 26.0.2, ou ≥ 25.0.5
+  na série 25, ou ≥ 23.0.11 na 23: a correção da CVE-2024-29018 e a da CVE-2024-32473, que só afeta o
+  26.0.0 e o 26.0.1), uma **sonda local** numa rede não
   interna criada pelo teste (com a imagem do worker do próprio `build`, sem baixar nada) que o worker
   alcança e o motor não; o motor não resolve nem alcança a api, o banco nem o gateway da rede interna
   (o `Gateway` do `inspect` ou, sem ele, no Engine ≥ 28, o primeiro endereço da sub-rede que nenhum
@@ -198,12 +199,13 @@ def _free_port() -> int:
 
 
 def _version_has_cve_fix(version: str) -> bool:
-    """CVE-2024-29018: corrigida no 26.0.0, no 25.0.5 e no 23.0.11."""
+    """CVE-2024-29018: corrigida no 26.0.0, no 25.0.5 e no 23.0.11. CVE-2024-32473: afeta só o 26.0.0 e o
+    26.0.1, e foi corrigida no 26.0.2."""
     match = re.match(r"(\d+)\.(\d+)\.(\d+)", version)
     if not match:
         return False
     v = tuple(int(x) for x in match.groups())
-    return v >= (26, 0, 0) or (v[0] == 25 and v >= (25, 0, 5)) or (v[0] == 23 and v >= (23, 0, 11))
+    return v >= (26, 0, 2) or (v[0] == 25 and v >= (25, 0, 5)) or (v[0] == 23 and v >= (23, 0, 11))
 
 
 class _Stack:
@@ -539,11 +541,13 @@ def test_engine_effective_isolation(engine_stack: _Stack) -> None:
     assert [n for n in env_names if n.startswith("CQ_")] == [], env_names
     assert find_secrets("\n".join(info["Config"]["Env"]), stack.hidden) == []
 
-    # 2. Versão do Docker Engine com a correção da CVE-2024-29018.
+    # 2. Versão do Docker Engine com as correções da CVE-2024-29018 e da CVE-2024-32473.
     version = _docker("version", "--format", "{{.Server.Version}}").stdout.strip()
-    assert _version_has_cve_fix(version), f"Docker Engine {version} sem a correção da CVE-2024-29018"
-    assert [_version_has_cve_fix(v) for v in ("26.0.0", "27.3.1", "25.0.5", "25.0.4", "24.0.9", "23.0.11",
-                                              "23.0.10")] == [True, True, True, False, False, True, False]
+    assert _version_has_cve_fix(version), (
+        f"Docker Engine {version} sem a correção da CVE-2024-29018 ou da CVE-2024-32473 (mínimo: 26.0.2)")
+    assert [_version_has_cve_fix(v) for v in ("26.0.0", "26.0.1", "26.0.2", "27.3.1", "25.0.5", "25.0.4", "24.0.9",
+                                              "23.0.11", "23.0.10")] == [False, False, True, True, True, False, False,
+                                                                         True, False]
 
     # 3. A sonda: rede não interna do teste e um servidor HTTP com a imagem do worker do próprio build.
     worker_id = stack.container("worker")

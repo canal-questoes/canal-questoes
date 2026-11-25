@@ -303,15 +303,20 @@ Conferência: depois da troca e da nova exportação, este passo imprime `Dono c
 
 ## 6. Commit, push e pull request
 
-**[comando pronto]** No clone público, um commit só com a publicação:
+**[comando pronto]** No clone público, um commit só com a publicação. A mensagem é a do `MENSAGEM`, sem trocá-la e
+sem acrescentar outro texto. O autor continua o nome e o e-mail públicos. Quando um agente faz o commit, ponha em `COAUTOR`
+a linha de atribuição que ele usa nos commits, no formato `Nome <e-mail>`: o commit ganha no fim a linha
+`Co-Authored-By` com ela. Quando uma pessoa faz o commit, deixe `COAUTOR` vazio, e o commit sai sem essa linha.
 
 ```bash
-git -c user.name="$NOME" -c user.email="$EMAIL" commit -q -m "$MENSAGEM"
+COAUTOR=""   # vazio, ou a atribuição do agente que faz o commit, no formato "Nome <e-mail>"
+git -c user.name="$NOME" -c user.email="$EMAIL" commit -q -m "$MENSAGEM" ${COAUTOR:+--trailer "Co-Authored-By: $COAUTOR"}
 git log -1 --format='%an <%ae>%n%s%n%b'
 ```
 
-Conferência: o `git log` mostra o nome e o e-mail públicos, a mensagem da publicação (a do `MENSAGEM`) e nenhuma
-linha `Co-Authored-By`.
+Conferência: o `git log` mostra o nome e o e-mail públicos e a mensagem da publicação (a do `MENSAGEM`). Se um agente
+fez o commit, a única linha depois dela é a `Co-Authored-By` com a atribuição do agente; se foi uma pessoa, não há
+nenhuma linha `Co-Authored-By`.
 
 **[mantenedor]** Enviar a branch e abrir a pull request, com a seção da publicação no CHANGELOG como descrição:
 
@@ -415,3 +420,14 @@ foi fechado, defina de novo as variáveis e refaça as duas linhas do `NOTAS` an
 
 Conferência: a linha `tagger` mostra o nome e o e-mail públicos; o `gh release view` mostra a release `v0.y.z` com as
 notas da versão.
+
+## Entre as versões: as pull requests do Dependabot
+
+O Dependabot ([`.github/dependabot.yml`](../../.github/dependabot.yml)) abre toda semana, no repositório público,
+pull requests de atualização das dependências. Nenhuma delas recebe merge no público: a cópia do passo 3 substitui a
+árvore pública inteira, e uma mudança feita só lá voltaria ao conteúdo da origem na versão seguinte. **[mantenedor]**
+Para cada uma, decidir se a atualização entra. A aceita é feita no repositório de origem, com os testes de sempre, e
+chega ao público na versão seguinte, pela pull request `versao/v0.y.z`. Aceita ou recusada, a pull request do
+Dependabot é fechada sem merge, com um comentário curto que diga o destino (por exemplo, "Aceita: a atualização entra
+na próxima versão" ou "Fechada sem merge: o projeto fixa o Python 3.12"). As versões que o projeto fixa de propósito
+ficam no `ignore` do arquivo, para o Dependabot não as propor de novo.

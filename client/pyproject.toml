@@ -1,6 +1,6 @@
 [project]
 name = "cq-client"
-version = "0.1.1"
+version = "0.1.2"
 description = "canal-questoes: pacote cliente (cliente da API e CLI cq; base do servidor MCP)"
 requires-python = ">=3.12,<3.13"
 dependencies = [

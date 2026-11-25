@@ -10,6 +10,49 @@ coisa pode mudar de uma versão para a outra.
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-11-24
+
+Versão de manutenção: o Docker Engine mínimo sobe para o 26.0.2, por uma falha de segurança do 26.0.0 e do 26.0.1; o
+CI passa a fixar a versão do uv; e mudam o guia de publicação de versões, o documento dos princípios, dois textos dos
+contratos e um comentário do workflow do motor. O funcionamento do sistema não muda; muda só o número da versão que
+ele mostra.
+
+### Modificado
+
+- **Número da versão:** os pacotes `cq-server` e `cq-client` e o plugin do Claude Code passam a 0.1.2, e é esse o
+  número que a saúde da API (`GET /health`, `cq health` e `cq status`) e o servidor MCP mostram.
+- **CI:** a ação que instala o uv passa da 10.3.3 para a 10.4.0, e o CI fixa o uv 0.11.16, o mesmo da imagem da api e
+  do worker; antes, ele instalava a versão mais recente do uv.
+- **Lista de testes instáveis do CI** (`ops/ci/known-flaky.txt`): ganhou um teste de integração, o da recusa do
+  cabeçalho de cliente inválido, que falhou uma vez com um erro do banco na preparação dos dados do próprio teste e
+  passou isolado.
+- **Dependabot:** deixa de propor as versões menores e maiores da imagem do Python, porque o projeto fixa o Python
+  3.12, e as do `uv-build`, que acompanha o uv fixado.
+- **Guia de publicação de versões:** a seção nova "Entre as versões: as pull requests do Dependabot" diz que nenhuma
+  delas recebe merge no repositório público: a atualização aceita entra pela versão seguinte.
+- **Guia de publicação de versões, passo 6:** quando um agente faz o commit da versão no clone público, o commit leva
+  a linha `Co-Authored-By` com a atribuição do agente, e a conferência do passo passa a pedir essa linha; a mensagem
+  continua a do guia, `chore(release): v<versão>`, sem outro texto.
+- **Princípios** ([`docs/explicacao/principios.md`](docs/explicacao/principios.md)): o princípio V passa a dizer que
+  o provisionamento de bots é hoje parte da porta do Telegram, com o token colado à mão, e que uma porta própria é a
+  evolução prevista para os bots gerenciados do Telegram. O documento passa a citar a versão 1.0.1 do documento
+  interno de princípios, que ganhou essa emenda de redação.
+- **Contratos:** no catálogo, o motivo de a verificação de saúde da API (`system.health`) ficar fora do MCP agora diz
+  onde fica o diagnóstico no MCP: na `run_doctor` e, na pilha local, na `stack_status`, que mostra a saúde da API. A
+  descrição da ferramenta `stack_status` passa a citar também a saúde da API. Só texto: nenhum comportamento muda.
+- **Workflow do motor:** o comentário do topo do `engine.yml` não diz mais que a cópia pública confere o congelamento
+  dos testes do motor; essa conferência só roda no repositório de origem.
+- **Conferência do congelamento dos testes** (`scripts/check-frozen-tests.sh`): com a lista de hashes dos testes do
+  motor, o script para com o código 2 e aponta o `scripts/check-frozen-engine-tests.sh`, que é o conferidor dessa
+  lista; antes, ele acusava que a lista de arquivos congelados tinha mudado.
+
+### Segurança
+
+- **Docker Engine mínimo:** sobe de 26.0.0 para 26.0.2, por causa da CVE-2024-32473: no 26.0.0 e no 26.0.1, o IPv6
+  não é desativado nas interfaces de redes só IPv4. O cabeçalho do `compose.yaml`, o guia de implantação na VM, o
+  tutorial de primeiro uso e o teste de sistema do isolamento do motor passam a pedir o 26.0.2; as séries 25 e 23
+  continuam aceitas a partir do 25.0.5 e do 23.0.11, que não têm essa falha.
+
 ## [0.1.1] - 2026-11-22
 
 Versão de correção, só de documentação e de testes: o tutorial de primeiro uso, depois de seguido de ponta a ponta, o

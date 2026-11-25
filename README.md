@@ -63,7 +63,7 @@ Os alunos não instalam nada além do Telegram: eles só conversam com o bot do 
 
 ## Estado do projeto
 
-A versão atual é a **v0.1.1**. A primeira pública foi a **v0.1.0**. O piloto com alunos de uma disciplina da
+A versão atual é a **v0.1.2**. A primeira pública foi a **v0.1.0**. O piloto com alunos de uma disciplina da
 **Unicamp** ainda não começou; quando começar, ele vai rodar o código desta versão. As versões seguem o
 [SemVer](https://semver.org/lang/pt-BR/) na faixa
 0.y.z: até a 1.0.0, a API, o CLI e os formatos ainda podem mudar de uma versão para outra, e o

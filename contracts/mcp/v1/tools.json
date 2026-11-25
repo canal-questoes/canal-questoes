@@ -566,7 +566,7 @@
         "command": "status"
       },
       "title": "Estado da pilha local",
-      "description": "Mostra o estado da pilha local do perfil (os contêineres do Docker Compose).",
+      "description": "Mostra o estado da pilha local do perfil: os contêineres do Docker Compose e a saúde da API.",
       "annotations": {
         "readOnlyHint": true,
         "destructiveHint": false,
