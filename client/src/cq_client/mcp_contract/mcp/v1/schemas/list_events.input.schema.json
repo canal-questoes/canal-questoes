@@ -6,7 +6,7 @@
     "types": {
       "type": "array",
       "minItems": 1,
-      "maxItems": 48,
+      "maxItems": 49,
       "uniqueItems": true,
       "items": {
         "type": "string",

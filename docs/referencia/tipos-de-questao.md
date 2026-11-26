@@ -14,6 +14,7 @@ O disparo de uma questão (no CLI, `cq dispatches prepare`) recebe três dados:
 | --- | --- |
 | `repo` | a URL `https` do repositório git do curso, sem porta, sem IP e sem credenciais, com o host em minúsculas e o caminho só com letras, dígitos, `.`, `_`, `~` e `-`; o host tem de estar na lista `CQ_REPO_ALLOWED_HOSTS` do servidor (vazia, ela recusa todo repositório) |
 | `commit` | o SHA do commit, com 40 ou 64 dígitos hexadecimais minúsculos |
+| `repo` e `commit` de um banco enviado | `bank:<nome>` no `repo` e a versão do banco (64 dígitos hexadecimais minúsculos) no `commit`, para um banco enviado com `cq banks upload` ou pela ferramenta `upload_question_bank`; essa forma não passa pela lista `CQ_REPO_ALLOWED_HOSTS` ([Banco de questões local](../operacao/banco-local.md)) |
 | `qid` | o caminho da questão relativo à pasta `questions/` do curso, como no PrairieLearn: segmentos de letras, dígitos, `_`, `.` ou `-`, sem `.` nem `..` |
 
 A pasta da questão segue o formato do PrairieLearn: o `info.json` com os metadados, o `question.html` e, se houver, o

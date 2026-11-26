@@ -40,7 +40,7 @@ from __future__ import annotations
 import functools
 import re
 import unicodedata
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 
 SECRET_MARKER = "[segredo]"
@@ -294,3 +294,13 @@ def redact(text: str, identities: Iterable[KnownIdentity], *,
     secret_spans = _secret_spans(text, secrets)
     hits = _person_hits(text, targets, secret_spans)
     return _replace(text, hits, secret_spans)
+
+
+def redact_operator_text(value: str, identities: Sequence[KnownIdentity], *,
+                         secrets: Iterable[str | None] = ()) -> str:
+    """Um texto do operador que tem forma de caminho (o `repo` e o `qid` do disparo, o nome e o `repo` de um
+    banco enviado) na saída: a redação de `redact` e, como alvo extra, a parte local do e-mail de cada
+    pessoa, com a mesma fronteira por classe do nome. O valor gravado fica literal."""
+    extra = [KnownIdentity(alias=identity.alias, full_name=identity.email.split("@", 1)[0], ra=None, email=None)
+             for identity in identities if identity.email and identity.email.split("@", 1)[0]]
+    return redact(value, [*identities, *extra], secrets=secrets)

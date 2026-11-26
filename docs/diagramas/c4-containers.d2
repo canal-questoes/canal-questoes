@@ -10,6 +10,7 @@ classes: {
 cli: "CLI + servidor MCP\n(pacote cliente)" {class: externo}
 integracoes: "Integrações\n(banco de questões, feedback)" {class: externo}
 repos: "Repositórios PL (git)" {class: externo}
+local: "Banco local do operador\n(pasta do curso ou git local)" {class: externo}
 
 sistema: "canal-questoes (docker compose)" {
   api: "api\nAPI HTTP, sem estado" {class: nosso}
@@ -18,17 +19,18 @@ sistema: "canal-questoes (docker compose)" {
   postgres: "postgres\nestado, eventos, filas" {shape: cylinder; class: externo}
   cache: "volume repos\n(somente leitura p/ engine)" {shape: stored_data; class: externo}
 
-  api <-> postgres
+  api <-> postgres: "estado; grava o pacote do banco enviado\n(imutável, versão = SHA-256)"
   worker <-> postgres: "filas (SKIP LOCKED)\navisos (LISTEN/NOTIFY)"
   worker -> engine: "HTTP interno"
-  worker -> cache: "git fetch"
+  worker -> cache: "git fetch;\npublica o banco enviado"
   engine -> cache: "lê"
 }
 
 telegram: "Telegram (Bot API)" {class: externo}
 email: "E-mail (SMTP)" {class: externo}
 
-cli -> sistema.api
+cli -> local: "lê"
+cli -> sistema.api: "administra; envia o banco (pacote)"
 integracoes -> sistema.api: "disparos; consulta de eventos"
 sistema.worker -> repos
 sistema.worker <-> telegram

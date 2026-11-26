@@ -91,6 +91,8 @@ PERSON_REF = {"type": "string",
 # corpo do pedido da API.
 PATH_FIELDS = frozenset({"offering", "dispatch_id"})
 PATH_AND_QUERY_FIELDS = frozenset({"offering", "dispatch_id", "person", "after", "limit", "types", "version"})
+# Banco de questões local: o filtro pelo nome exato da listagem.
+PATH_AND_QUERY_FIELDS |= {"name"}
 
 # As exceções nomeadas das formas de entrada, uma a uma. `removed` sai do corpo; `replaced` troca o esquema do
 # campo; `added` entra; `required_added` passa a obrigatório.
@@ -104,6 +106,15 @@ INPUT_FORM_EXCEPTIONS: dict[str, dict[str, Any]] = {
     }},
     "import_students": {"removed": {"rows"}, "added": {"path": {"type": "string", "minLength": 1, "maxLength": 4096}},
                         "required_added": {"path"}},
+    # Banco de questões local: o servidor MCP lê e empacota a pasta; o modelo dá só o caminho, o nome e,
+    # para o git local, a revisão (a versão, a origem, o commit e o pacote saem da leitura, não do modelo).
+    "upload_question_bank": {
+        "removed": {"version", "source", "git_commit", "archive"},
+        "added": {"path": {"type": "string", "minLength": 1, "maxLength": 4096},
+                  "git_rev": {"type": "string", "minLength": 1, "maxLength": 256,
+                              "pattern": "^[A-Za-z0-9_./@{}~^][A-Za-z0-9_./@{}~^-]*$"}},
+        "required_added": {"path"},
+    },
 }
 
 # o que cada ferramenta destrutiva exige do preparo (o código, ou o `dispatch_id` do `confirm_dispatch`).
@@ -117,6 +128,8 @@ TOOLS_CITED_BY_MESSAGES = frozenset({"stack_logs", "run_doctor", "stack_status",
 FIXED_LOCAL_KEYS = frozenset({"api_unreachable", "api_error", "unexpected_response", "result_too_large", "no_token",
                               "file.roster", "stack_busy", "down_code_invalid", "down_nothing_to_stop",
                               "file.not_absolute", "file.not_found", "file.not_regular", "mcp_internal"})
+# Banco de questões local: a recusa local da leitura da pasta ou do git, com a mensagem fixa do motivo.
+FIXED_LOCAL_KEYS |= {"bank.read"}
 
 CLI_COMMAND_RE = re.compile(r"\bcq\s+[a-z]")
 PASTE_RE = re.compile(r"\bcol(?:e|ar|ando|em)\b", re.IGNORECASE)
@@ -374,7 +387,8 @@ def test_tools_list_body_fields_match_api_requests(tmp_path: Path, mode: str) ->
     obrigatórios também, salvo as exceções nomeadas, uma a uma: `create_offering` e
     `update_offering_settings` sem `contact_email`; `update_offering_settings.free_messages` obrigatório;
     `prepare_dispatch` sem `origin`; `reveal_identities.reason` com `minLength: 1` e `pseudonyms` com itens
-    `PERSON_REF` (1 a 100); `import_students` com `path` no lugar de `rows`. As demais ferramentas do catálogo (sem
+    `PERSON_REF` (1 a 100); `import_students` com `path` no lugar de `rows`; `upload_question_bank` com `path`
+    (obrigatório) e `git_rev` no lugar de `version`, `source`, `git_commit` e `archive`. As demais ferramentas do catálogo (sem
     corpo) só têm campos de caminho e de consulta.
 
     Vermelho no esqueleto: `build_server` lança `NotImplementedError`."""
@@ -530,6 +544,7 @@ def test_mcp_messages_have_closed_keys_and_no_token_instructions(tmp_path: Path)
     assert "180" in up_timeout and "api, worker" in up_timeout
     assert "CQ_DB_PASSWORD" in MCP_MESSAGES["stack.StackVariableMissing"].format(name="CQ_DB_PASSWORD")
     assert MCP_MESSAGES["file.roster"].format(reason="motivo fixo") == "motivo fixo"
+    assert MCP_MESSAGES["bank.read"].format(reason="motivo fixo") == "motivo fixo"
     assert "cq-demo" in MCP_HINT_TEMPLATE.format(project="cq-demo")
 
     texts = [*MCP_MESSAGES.values(), MCP_HINT_TEMPLATE, *MCP_STDERR_MESSAGES.values()]

@@ -3240,6 +3240,39 @@ def _case_offering_purged(ctx: _FailClosedCtx) -> None:
         ("bootstrap", {"offering_id": scenario.offering_id, **outcome})]
 
 
+def _case_bank_uploaded(ctx: _FailClosedCtx) -> None:
+    """O banco de questões local: o envio de um banco novo (o curso de fixture, empacotado à mão) com o COMMIT do
+    `bank.uploaded` falhando → 500 exato e nenhuma linha em `question_banks`; sem o gatilho, o mesmo envio responde
+    200 com `created: true`, uma linha e o evento exato com o ator. No esqueleto, a rota lança antes de gravar, e o
+    controle recebe 500."""
+    from tests.helpers import banks as bank_fixtures
+
+    files = bank_fixtures.course_files()
+    version = bank_fixtures.reference_version(files)
+    body = bank_fixtures.upload_body("banco-falha-fechada", version, "folder", None,
+                                     bank_fixtures.archive_of(files))
+
+    def call() -> Any:
+        return ctx.client.post("/v1/question-banks", json=body, headers=auth(ADMIN_TOKEN))
+
+    _api_fails_closed(ctx, "bank.uploaded", "POST", "/v1/question-banks", call)
+    assert _count(ctx.sql, "question_banks") == 0
+
+    # Controle: sem o gatilho, o mesmo envio guarda o banco e é auditado.
+    ok = call()
+    assert ok.status_code == 200, ok.text[:300]
+    assert_matches("banks.upload", 200, ok.json())
+    counts = {"file_count": len(files), "byte_count": sum(len(data) for data in files.values()),
+              "question_count": bank_fixtures.reference_question_count(files)}
+    assert ok.json() == {"name": "banco-falha-fechada", "version": version, "repo": "bank:banco-falha-fechada",
+                         "source": "folder", "git_commit": None, **counts, "created_at": iso(ctx.clock.now()),
+                         "created": True}
+    assert _count(ctx.sql, "question_banks") == 1
+    assert _event_data(ctx.sql, "bank.uploaded") == [
+        ("bootstrap", {"bank": "banco-falha-fechada", "version": version, "source": "folder", "git_commit": None,
+                       **counts})]
+
+
 FAIL_CLOSED_CASES: dict[str, Callable[[_FailClosedCtx], None]] = {
     "identity.revealed": _case_identity_revealed,
     "identity.reveal_denied": _case_identity_reveal_denied,
@@ -3295,6 +3328,8 @@ FAIL_CLOSED_CASES: dict[str, Callable[[_FailClosedCtx], None]] = {
     # CLI (expurgo)
     "offering.purge_prepared": _case_offering_purge_prepared,
     "offering.purged": _case_offering_purged,
+    # Banco de questões local
+    "bank.uploaded": _case_bank_uploaded,
 }
 
 
@@ -3396,6 +3431,10 @@ def test_event_commit_failure_fails_closed(
     tabelas do expurgo e `offerings` iguais pelo `snapshot_purge_tables`, `purged_at` nulo) e o código
     continua válido; sem o gatilho, com o mesmo código, 200 com o resultado exato e um único
     `offering.purged`. Em todos, o log sem canário e sem `Traceback`, com `event: exception` só na API.
+
+    Banco de questões local: `bank.uploaded` → `banks.upload` de um banco novo → 500 exato, sem linha em
+    `question_banks`; sem o gatilho, 200 com `created: true`, uma linha e o evento exato. No esqueleto, a rota do
+    envio lança `NotImplementedError`, e o controle recebe 500.
     No esqueleto: `EventType` sem os 2 tipos."""
     assert set(FAIL_CLOSED_CASES) == {t.value for t in EventType}
     FAIL_CLOSED_CASES[event_type](_FailClosedCtx(
@@ -3622,7 +3661,8 @@ def test_body_on_bodyless_route_is_rejected(op_id: str, client: Any,
     Relatórios: `reports.get`, `reports.list_versions`,
     `reports.resend_summary` e `offerings.get_digest` (só `offerings.update_digest` tem esquema de pedido). CLI:
     `system.doctor` e `offerings.prepare_purge` (só
-    `offerings.purge` tem esquema de pedido)."""
+    `offerings.purge` tem esquema de pedido). Banco de questões local: `banks.list` (só `banks.upload` tem esquema
+    de pedido); no esqueleto, a rota lança `NotImplementedError` (500)."""
     assert set(BODYLESS_V1_OPS) == {"people.list", "people.get", "tokens.list", "tokens.revoke",
                                     "events.list",
                                     # Oferecimentos e bots
@@ -3637,7 +3677,9 @@ def test_body_on_bodyless_route_is_rejected(op_id: str, client: Any,
                                     "reports.get", "reports.list_versions", "reports.resend_summary",
                                     "offerings.get_digest",
                                     # CLI
-                                    "system.doctor", "offerings.prepare_purge"}
+                                    "system.doctor", "offerings.prepare_purge",
+                                    # Banco de questões local
+                                    "banks.list"}
     state = seed_state(client, revoke_targets=len(BODIES) + 1)
     admin = auth(ADMIN_TOKEN)
     before = _fingerprint(sql)

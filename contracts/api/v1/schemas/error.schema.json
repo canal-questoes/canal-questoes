@@ -89,7 +89,12 @@
                   "too_many",
                   "out_of_range",
                   "invalid_value",
-                  "duplicate"
+                  "duplicate",
+                  "too_large",
+                  "path_not_allowed",
+                  "entry_not_allowed",
+                  "not_a_course",
+                  "mismatch"
                 ]
               }
             }

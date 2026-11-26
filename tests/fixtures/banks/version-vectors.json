@@ -1,0 +1,98 @@
+{
+  "format": "cq-bank-v1",
+  "definition": "sha256(b'cq-bank-v1\n' + concat, em ordem crescente dos bytes UTF-8 do caminho, de caminho + b'\u0000' + str(tamanho) + b'\u0000' + sha256hex(conteudo) + b'\n'), em hexadecimal minúsculo",
+  "cases": [
+    {
+      "id": "minimo",
+      "description": "Curso mínimo: só o infoCourse.json (0 questões).",
+      "files": [
+        {
+          "path": "infoCourse.json",
+          "content_base64": "eyJ1dWlkIjogIjAwMDAwMDAwLTAwMDAtNDAwMC04MDAwLTAwMDAwMDAwMDAwMSIsICJuYW1lIjogIlNJTlQgMDAxIn0K"
+        }
+      ],
+      "question_count": 0,
+      "version": "334d34d1b4242deec3e18d8daedbc2dfd94cc6c523a9f7da914cd61d8e2c8930"
+    },
+    {
+      "id": "ordem_por_bytes",
+      "description": "Arquivo vazio, nomes acentuados, binário de 256 bytes; a ordem por bytes põe B.txt antes de a.txt e a-b/x.txt antes de a/b.txt (diferente da ordem alfabética e da ordem de árvore do git).",
+      "files": [
+        {
+          "path": "infoCourse.json",
+          "content_base64": "eyJ1dWlkIjogIjAwMDAwMDAwLTAwMDAtNDAwMC04MDAwLTAwMDAwMDAwMDAwMiIsICJuYW1lIjogIlNJTlQgMDAyIn0K"
+        },
+        {
+          "path": "a.txt",
+          "content_base64": "YQo="
+        },
+        {
+          "path": "B.txt",
+          "content_base64": "Qgo="
+        },
+        {
+          "path": "a-b/x.txt",
+          "content_base64": "eAo="
+        },
+        {
+          "path": "a/b.txt",
+          "content_base64": "Ygo="
+        },
+        {
+          "path": "vazio.txt",
+          "content_base64": ""
+        },
+        {
+          "path": "questions/q1/info.json",
+          "content_base64": "eyJ0aXRsZSI6ICJRMSJ9Cg=="
+        },
+        {
+          "path": "questions/ação/info.json",
+          "content_base64": "eyJ0aXRsZSI6ICJBY2FvIn0K"
+        },
+        {
+          "path": "zé.bin",
+          "content_base64": "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8gISIjJCUmJygpKissLS4vMDEyMzQ1Njc4OTo7PD0+P0BBQkNERUZHSElKS0xNTk9QUVJTVFVWV1hZWltcXV5fYGFiY2RlZmdoaWprbG1ub3BxcnN0dXZ3eHl6e3x9fn+AgYKDhIWGh4iJiouMjY6PkJGSk5SVlpeYmZqbnJ2en6ChoqOkpaanqKmqq6ytrq+wsbKztLW2t7i5uru8vb6/wMHCw8TFxsfIycrLzM3Oz9DR0tPU1dbX2Nna29zd3t/g4eLj5OXm5+jp6uvs7e7v8PHy8/T19vf4+fr7/P3+/w=="
+        }
+      ],
+      "question_count": 2,
+      "version": "5d77c34dede5d2b246e1ea13bf47f86b17930da9013afb0d444bdac5d08947cd"
+    },
+    {
+      "id": "um_byte",
+      "description": "O curso mínimo com um único byte trocado no infoCourse.json ('SINT 001' → 'SINT 002'): outra versão.",
+      "files": [
+        {
+          "path": "infoCourse.json",
+          "content_base64": "eyJ1dWlkIjogIjAwMDAwMDAwLTAwMDAtNDAwMC04MDAwLTAwMDAwMDAwMDAwMSIsICJuYW1lIjogIlNJTlQgMDAyIn0K"
+        }
+      ],
+      "question_count": 0,
+      "version": "ff484b2d8102c8f0acdffe4a8622ad1ea4ad3a258b75d50f27bb2f45272933d7"
+    },
+    {
+      "id": "aninhada",
+      "description": "Contagem de questões com uma questão dentro de outra: questions/a/b/info.json não conta, porque questions/a/info.json existe; questions/x/y/info.json conta, porque questions/x/ não é questão (o critério do motor).",
+      "files": [
+        {
+          "path": "infoCourse.json",
+          "content_base64": "eyJ1dWlkIjogIjAwMDAwMDAwLTAwMDAtNDAwMC04MDAwLTAwMDAwMDAwMDAwMyIsICJuYW1lIjogIlNJTlQgMDAzIn0K"
+        },
+        {
+          "path": "questions/a/info.json",
+          "content_base64": "eyJ0aXRsZSI6ICJBIn0K"
+        },
+        {
+          "path": "questions/a/b/info.json",
+          "content_base64": "eyJ0aXRsZSI6ICJCIn0K"
+        },
+        {
+          "path": "questions/x/y/info.json",
+          "content_base64": "eyJ0aXRsZSI6ICJZIn0K"
+        }
+      ],
+      "question_count": 2,
+      "version": "5f38efb45663734e0d571aed6c0a2950709e3af0d6612204d54f0d36d93eb2f3"
+    }
+  ]
+}

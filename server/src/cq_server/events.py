@@ -1,11 +1,11 @@
 """Log de eventos, com o catálogo fechado dos tipos e dos campos de cada um
-(48 tipos).
+(49 tipos).
 
 Funções de núcleo, sem HTTP, que os módulos de domínio usam **na transação do chamador**:
 
 - `append_event(conn, event_type, data, *, occurred_at, actor_token_id=None, secrets=(),
   identities=None) -> int`: grava um evento e devolve o `seq`. O `data` é conferido contra os campos
-  do tipo (objeto fechado) e o texto livre dele (`label`, `reason`, `error`) é
+  do tipo (objeto fechado) e o texto livre dele (`label`, `reason`, `error`, `name`, `bank`) é
   **redigido na gravação**, com as identidades cadastradas naquele momento (as da própria transação
   inclusive). Não confirma nada: o evento entra junto com a mudança, no COMMIT do chamador. A
   ordem de `seq` é garantida pelo gatilho de lock consultivo do banco, com a
@@ -19,7 +19,8 @@ Funções de núcleo, sem HTTP, que os módulos de domínio usam **na transaçã
   não é evento (ex.: `api_tokens.label`, `tasks.last_error`, `outbox_messages.last_error`) com as
   identidades do momento.
 - `redact_event_data(event_type, data, identities, *, secrets=()) -> dict`: redige só os campos de
-  texto livre de um `data` (usado na gravação e de novo na saída).
+  texto livre de um `data` (usado na gravação e de novo na saída); os de forma de caminho do operador
+  (`OPERATOR_PATH_FIELDS`) também com a parte local de cada e-mail.
 - `query_events(conn, types, *, after=0, limit=100, secrets=(), identities=None) -> EventPage`: lê
   eventos por cursor (`seq > after`, ordem de `seq`, no máximo `limit`), com o texto livre redigido
   **de novo na saída**, com as identidades do momento da leitura, e `occurred_at` em UTC.
@@ -43,7 +44,7 @@ from typing import Any
 import psycopg
 from psycopg.types.json import Jsonb
 
-from cq_server.redaction import KnownIdentity, redact
+from cq_server.redaction import KnownIdentity, redact, redact_operator_text
 
 
 class EventType(StrEnum):
@@ -103,6 +104,8 @@ class EventType(StrEnum):
     # expurgo, só com contagens (sem pseudônimo, identidade nem o código).
     OFFERING_PURGE_PREPARED = "offering.purge_prepared"
     OFFERING_PURGED = "offering.purged"
+    # O banco de questões local: o primeiro envio de cada nome e versão.
+    BANK_UPLOADED = "bank.uploaded"
 
 
 # Os campos de `data` de cada tipo (objetos fechados; dos de oferecimentos em diante, cada tipo
@@ -187,6 +190,10 @@ EVENT_FIELDS: dict[EventType, frozenset[str]] = {
     EventType.OFFERING_PURGED: frozenset({"offering_id", "identities_deleted", "identities_kept",
                                           "endpoints", "updates", "free_messages_redacted",
                                           "outbox_redacted", "contact_email_deleted"}),
+    # O banco enviado: o nome do banco no campo `bank` (texto livre do operador), a versão, a origem e as
+    # contagens; sem caminho local, nome de arquivo nem conteúdo.
+    EventType.BANK_UPLOADED: frozenset({"bank", "version", "source", "git_commit", "file_count", "byte_count",
+                                        "question_count"}),
 }
 
 # Os campos de texto livre (`x-free-text`) de cada tipo.
@@ -198,10 +205,18 @@ FREE_TEXT_FIELDS: dict[EventType, tuple[str, ...]] = {
     EventType.TASK_FAILED: ("error",),
     EventType.OUTBOX_FAILED: ("error",),
     EventType.OUTBOX_REPLY_FAILED: ("error",),
+    EventType.BANK_UPLOADED: ("bank",),
+}
+
+# Os campos de texto livre que são texto do operador com forma de caminho (o nome de um banco enviado): além da
+# redação comum, levam como alvo extra a parte local do e-mail de cada pessoa (`redact_operator_text`), na
+# gravação e de novo na leitura, como nas demais saídas desse texto.
+OPERATOR_PATH_FIELDS: dict[EventType, frozenset[str]] = {
+    EventType.BANK_UPLOADED: frozenset({"bank"}),
 }
 
 # Os campos de pessoa
-# (pseudônimo) de cada tipo, lista fechada, 19 dos 48 tipos; `is_list` marca os campos que guardam uma
+# (pseudônimo) de cada tipo, lista fechada, 19 dos 49 tipos; `is_list` marca os campos que guardam uma
 # lista de pseudônimos. É a base do filtro `person` de `query_events`.
 @dataclass(frozen=True)
 class PersonField:
@@ -299,14 +314,23 @@ def redact_free_text(conn: psycopg.Connection, text: str, *, secrets: Iterable[s
 
 def redact_event_data(event_type: str, data: Mapping[str, Any], identities: Sequence[KnownIdentity],
                       *, secrets: Iterable[str | None] = ()) -> dict:
-    """Cópia de `data` com os campos de texto livre do tipo redigidos (os demais ficam iguais)."""
+    """Cópia de `data` com os campos de texto livre do tipo redigidos (os demais ficam iguais).
+
+    Os campos de `OPERATOR_PATH_FIELDS` usam `redact_operator_text` (com a parte local de cada e-mail); os demais,
+    `redact`."""
     out = dict(data)
-    fields = FREE_TEXT_FIELDS.get(EventType(event_type), ())
+    etype = EventType(event_type)
+    fields = FREE_TEXT_FIELDS.get(etype, ())
+    path_fields = OPERATOR_PATH_FIELDS.get(etype, frozenset())
     secret_list = list(secrets)
+    known = list(identities)
     for field in fields:
         value = out.get(field)
         if isinstance(value, str):
-            out[field] = redact(value, identities, secrets=secret_list)
+            if field in path_fields:
+                out[field] = redact_operator_text(value, known, secrets=secret_list)
+            else:
+                out[field] = redact(value, known, secrets=secret_list)
     return out
 
 

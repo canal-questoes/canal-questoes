@@ -6,6 +6,9 @@ disco e o cadastro da referência, com a recusa sem eco do valor recebido.
   com ponto, sem porta, IP, userinfo, `?`, `#`, `%` nem `\\`). Casam o texto inteiro.
 - `validate_repo(repo, allowed_hosts)`: `None` = válido; senão `repo_length` · `repo_syntax` ·
   `repo_dot_segment` · `host_not_allowed` (a lista vazia recusa tudo).
+- `BANK_REPO`: a forma `bank:<nome>` de um banco de questões enviado (o nome no padrão do código do
+  oferecimento); `validate_ref_repo(repo, allowed_hosts)`: como `validate_repo`, mas aceita também a forma
+  `bank:`, sem a lista de hosts (`None`, ou um código de `REPO_ERRORS` ou `bank_name`).
 - `repo_key(repo)`: o SHA-256 hex do UTF-8 de `repo`, o mesmo cálculo do motor (a chave do diretório
   `<repos>/<repo_key>/<commit>/`). É a **única** definição.
 - `ensure_ref` cria ou acha a referência (`INSERT … ON CONFLICT DO NOTHING` + `SELECT`);
@@ -46,6 +49,12 @@ QID = re.compile(r"\A(?=.{1,512}\Z)(?!.*(?:^|/)\.{1,2}(?:/|\Z))[A-Za-z0-9_.-]+(?
 # Códigos de `validate_repo`.
 REPO_ERRORS = ("repo_length", "repo_syntax", "repo_dot_segment", "host_not_allowed")
 
+# A referência de um banco de questões enviado: `bank:<nome>`, com o nome no padrão do código do oferecimento.
+BANK_REPO = re.compile(r"\Abank:[a-z0-9][a-z0-9-]{2,39}\Z")
+# O prefixo que separa a forma `bank:` da `https` e a versão do banco no papel do commit (só 64 hexadecimais).
+_BANK_PREFIX = "bank:"
+_BANK_VERSION = re.compile(r"\A[0-9a-f]{64}\Z")
+
 # Um host cujo último rótulo é só
 # número (decimal, ou hexadecimal com `0x`) é um IP literal para o analisador de URL (a regra "ends in a
 # number" do WHATWG, que o curl segue): `REPO_URL` o aceita, mas a política o recusa como `repo_syntax`,
@@ -82,12 +91,23 @@ def validate_repo(repo: str, allowed_hosts: frozenset[str]) -> str | None:
     return None
 
 
+def validate_ref_repo(repo: str, allowed_hosts: frozenset[str]) -> str | None:
+    """O `repo` de uma referência de questão: `None` se é um `bank:<nome>` na forma de `BANK_REPO` (sem
+    a lista de hosts), ou o resultado de `validate_repo`; uma forma `bank:` fora do padrão é `bank_name`.
+    O valor nunca vai para o código devolvido."""
+    if isinstance(repo, str) and repo.startswith(_BANK_PREFIX):
+        return None if BANK_REPO.fullmatch(repo) is not None else "bank_name"
+    return validate_repo(repo, allowed_hosts)
+
+
 def _check_forms(repo: str, commit: str, qid: str) -> None:
     """As formas de `repo`, `commit` e `qid` (a tabela não tem CHECK). A lista de hosts é da
-    API (o preparo já a conferiu); aqui só a forma. `ValueError` sem o valor."""
-    if not isinstance(repo, str) or validate_repo(repo, frozenset({_host_of(repo)})) is not None:
+    API (o preparo já a conferiu); aqui só a forma: um `bank:<nome>` na forma de `BANK_REPO`, com a versão
+    (64 hexadecimais) no `commit`, ou uma `https` com 40 ou 64. `ValueError` sem o valor."""
+    if not isinstance(repo, str) or validate_ref_repo(repo, frozenset({_host_of(repo)})) is not None:
         raise ValueError("referência de questão com repo fora da forma")
-    if not isinstance(commit, str) or COMMIT.fullmatch(commit) is None:
+    is_bank = repo.startswith(_BANK_PREFIX)
+    if not isinstance(commit, str) or (_BANK_VERSION if is_bank else COMMIT).fullmatch(commit) is None:
         raise ValueError("referência de questão com commit fora da forma")
     if not isinstance(qid, str) or QID.fullmatch(qid) is None:
         raise ValueError("referência de questão com qid fora da forma")

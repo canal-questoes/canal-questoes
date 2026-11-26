@@ -20,8 +20,8 @@ automática):
   fluxo, na ordem (regra abaixo);
 - o `.claude/settings.json`: `permissions.ask` com as 6 regras MCP das confirmadoras e as 2 do terminal;
   cada regra MCP casa, por `fnmatch.fnmatchcase`, o nome do plugin e o nome direto da sua confirmadora e
-  nenhum outro; nenhuma `allow` começa por `mcp__`; as `allow` e as `deny` iguais às do `SETTINGS_BASE_COMMIT`; nenhum
-  `enabledPlugins`;
+  nenhum outro; nenhuma `allow` começa por `mcp__`; as `allow` iguais às do `SETTINGS_BASE_COMMIT`; as `deny` iguais
+  às dele sem a regra do `git push` (`GIT_PUSH_RULE`), que está em `ask`; nenhum `enabledPlugins`;
 - o guia `docs/operacao/plugin-e-agente.md` com as seções exigidas e o aviso do terminal.
 
 **Ferramenta citada (regra deste arquivo):** todo trecho de código em linha com um só identificador
@@ -84,7 +84,7 @@ SKILLS_DIR = PLUGIN_DIR / "skills"
 SETTINGS = REPO / ".claude" / "settings.json"
 QUICKSTART = REPO / "docs" / "operacao" / "plugin-e-agente.md"
 
-# **[F]** as `allow` e as `deny` do `.claude/settings.json` nesse commit não mudam.
+# **[F]** as `allow` do `.claude/settings.json` nesse commit não mudam; das `deny`, só a do `git push` sai, para `ask`.
 SETTINGS_BASE_COMMIT = "f7f14e2"
 
 # O contrato do plugin.
@@ -117,6 +117,8 @@ SKILL_TOOLS: dict[str, set[str]] = {
     "pilha": {"stack_status", "stack_up", "prepare_stack_down", "stack_down", "stack_logs", "run_doctor"},
     "revelacao": {"list_people", "get_person", "list_events", "reveal_identities"},
 }
+# Banco de questões local: a skill do disparo cita o envio do banco local e a listagem das versões.
+SKILL_TOOLS["disparo"] |= {"upload_question_bank", "list_question_banks"}
 SKILL_CONFIRM_TOOLS: dict[str, set[str]] = {
     "oferecimento": set(), "lista-e-convites": {"send_invites"}, "disparo": {"confirm_dispatch"},
     "relatorios": set(), "encerramento": {"archive_offering", "purge_offering"}, "pilha": {"stack_down"},
@@ -160,6 +162,8 @@ SKILL_STEP_CHAINS: dict[str, tuple[tuple[str, ...], ...]] = {
     "pilha": (("stack_status", "stack_up"), ("prepare_stack_down", "stack_down")),
     "revelacao": (("list_people|get_person|list_events", "reveal_identities"),),
 }
+# Banco de questões local: enviar o banco local (`upload_question_bank`) antes de preparar o disparo com ele.
+SKILL_STEP_CHAINS["disparo"] += (("upload_question_bank", "prepare_dispatch"),)
 # As instruções exigidas sem posição fixada: presença das palavras de `STEP_WORDS` no corpo.
 SKILL_REQUIRED_WORDS: dict[str, tuple[str, ...]] = {
     "oferecimento": ("operador", "terminal", "registrar", "bot", "equipe"),
@@ -191,6 +195,8 @@ TOKEN_SHAPE = re.compile(r"(?<![A-Za-z0-9_])cq_[A-Za-z0-9_-]{16,}")
 ASK_MCP_RULES = {f"mcp__*__{name}" for name in ("reveal_identities", "archive_offering", "send_invites",
                                                  "confirm_dispatch", "purge_offering", "stack_down")}
 ASK_TERMINAL_RULES = {"Bash(uv run cq identity *)", "Bash(cq identity *)"}
+# A regra do `git push`: negada no commit-base, perguntada agora (o envio passa pela aprovação do operador).
+GIT_PUSH_RULE = "Bash(git push*)"
 
 # Palavras do português para conferir que a descrição está em pt-BR.
 PT_BR_WORDS = re.compile(r"\b(o|a|os|as|de|do|da|dos|das|e|com|para|um|uma|no|na|pelo|pela)\b")
@@ -492,7 +498,9 @@ def test_skill_describes_required_steps_in_order(name: str) -> None:
       em texto e pede a confirmação; a skill serve para preparar, confirmar e acompanhar um disparo
       (conferir o oferecimento e o bot, preparar com a prévia em texto, confirmar e acompanhar); "mostrar" vem desse fluxo;
       "código": o mesmo vale para confirmar um disparo, com o código de confirmação. O pedido de confirmação ao
-      operador é conferido na seção `## Confirmação` (`test_skill_frontmatter_and_body`);
+      operador é conferido na seção `## Confirmação` (`test_skill_frontmatter_and_body`). Com um banco local, a
+      segunda cadeia: enviar o banco (`upload_question_bank`) antes de preparar (`prepare_dispatch`), porque o
+      preparo cita a versão enviada; a listagem (`list_question_banks`) só entra no conjunto de ferramentas;
     - `relatorios`: nenhuma cadeia nem palavra, porque a função da skill (consultar relatórios e o acompanhamento)
       não fixa passo nem ordem; vale só o conjunto de ferramentas
       (`test_skill_tools_exist_in_tools_list_and_match_table`);
@@ -538,8 +546,9 @@ def test_settings_ask_rules_cover_each_confirm_tool_by_both_names(tmp_path: Path
     arquivos do plugin e os nomes do `tools/list` real, cada regra `mcp__*__<confirmadora>` de `permissions.ask`
     casa (por `fnmatch.fnmatchcase`) exatamente os dois nomes da sua confirmadora
     (`mcp__plugin_canal-questoes_cq__<nome>` e `mcp__cq__<nome>`) e nenhum de outra ferramenta; as regras MCP de
-    `ask` são exatamente as 6; as 2 do terminal presentes; nenhuma `allow` começa por `mcp__`; as `allow` e as `deny`
-    iguais às do commit-base; nenhum `enabledPlugins`. As regras `ask` são passo do Pedro: até lá,
+    `ask` são exatamente as 6; as 2 do terminal presentes; nenhuma `allow` começa por `mcp__`; as `allow` iguais às
+    do commit-base; as `deny` iguais às do commit-base sem a regra do `git push`, que estava lá uma vez, e ela em
+    `ask`; nenhum `enabledPlugins`. As regras `ask` são passo do Pedro: até lá,
     esta é a falha esperada."""
     plugin_name = _read_json(PLUGIN_MANIFEST)["name"]
     servers = _read_json(PLUGIN_MCP)["mcpServers"]
@@ -562,13 +571,16 @@ def test_settings_ask_rules_cover_each_confirm_tool_by_both_names(tmp_path: Path
     base = _settings_at_base()
     permissions = settings["permissions"]
     assert permissions["allow"] == base["permissions"]["allow"]
-    assert permissions["deny"] == base["permissions"]["deny"]
+    base_deny = base["permissions"]["deny"]
+    assert base_deny.count(GIT_PUSH_RULE) == 1
+    assert permissions["deny"] == [rule for rule in base_deny if rule != GIT_PUSH_RULE]
     assert [rule for rule in permissions["allow"] if rule.startswith("mcp__")] == []
     assert "enabledPlugins" not in settings
 
     ask = permissions.get("ask", [])
     assert {rule for rule in ask if rule.startswith("mcp__")} == ASK_MCP_RULES
     assert ASK_TERMINAL_RULES <= set(ask)
+    assert GIT_PUSH_RULE in ask
     for rule in sorted(ASK_MCP_RULES):
         tool = rule.rsplit("__", 1)[1]
         assert tool in CONFIRM_TOOLS

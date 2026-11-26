@@ -32,7 +32,8 @@ pelo cliente MCP (o agente) com o comando configurado nele. O plugin do reposit�
 - **Erro:** o resultado sai marcado como erro, com o texto `[código] mensagem`. Nos erros da API, o código é o do
   [envelope de erro](api.md#envelope-de-erro) (como `invalid_state` ou `forbidden`), seguido, quando houver, da
   permissão que faltou, dos campos com problema e das contagens pendentes. Com a API inalcançável, o código é
-  `api_unreachable`.
+  `api_unreachable`. Na `upload_question_bank`, uma recusa da leitura local da pasta sai com o código `bank.read`,
+  antes de qualquer pedido.
 - **Erro de protocolo:** argumentos inválidos (fora do esquema de entrada, ou sem nenhum dos campos de que a ferramenta
   exige ao menos um: `types` ou `person` na `list_events`, `enabled` ou `local_time` na `update_offering_digest`) dão o
   erro -32602, com a mensagem fixa "Argumentos inválidos para a ferramenta.", antes de qualquer pedido; uma ferramenta
@@ -63,7 +64,7 @@ entra no contexto da conversa do agente.
 
 ## Ferramentas do catálogo
 
-As 31 ferramentas que chamam operações do catálogo. Em todas, `offering` é o código ou o identificador do
+As 33 ferramentas que chamam operações do catálogo. Em todas, `offering` é o código ou o identificador do
 oferecimento; `person` e `pseudonyms` são apelidos ou identificadores de pessoas; `after` e `limit` paginam as listas
 (`limit` de 1 a 500). A coluna "Tipo" segue as anotações de `tools.json`: só leitura, escrita ou destrutiva.
 
@@ -86,7 +87,7 @@ oferecimento; `person` e `pseudonyms` são apelidos ou identificadores de pessoa
 | `prepare_send_invites` | `invites.prepare_send` | `offering`, `valid_hours` (opcional, de 1 a 720) | escrita | não |
 | `send_invites` | `invites.send` | `offering`, `confirmation_code` | destrutiva | sim |
 | `resend_invites` | `invites.resend` | `offering`, `pseudonyms` (até 100), `valid_hours` (opcional) | escrita | não |
-| `prepare_dispatch` | `dispatches.prepare` | `offering`, `repo`, `commit`, `qid`, `opens_at` (opcional), `closes_at` (opcional) | escrita | não |
+| `prepare_dispatch` | `dispatches.prepare` | `offering`, `repo` (a URL `https` ou a referência `bank:<nome>` de um banco enviado), `commit` (o SHA do commit ou a versão do banco), `qid`, `opens_at` (opcional), `closes_at` (opcional) | escrita | não |
 | `get_dispatch` | `dispatches.get` | `offering`, `dispatch_id` | leitura | não |
 | `list_dispatches` | `dispatches.list` | `offering`, `after` (opcional), `limit` (opcional) | leitura | não |
 | `confirm_dispatch` | `dispatches.confirm` | `offering`, `dispatch_id` | destrutiva | sim |
@@ -100,11 +101,24 @@ oferecimento; `person` e `pseudonyms` são apelidos ou identificadores de pessoa
 | `run_doctor` | `system.doctor` | nenhum | leitura | não |
 | `prepare_purge_offering` | `offerings.prepare_purge` | `offering` | escrita | não |
 | `purge_offering` | `offerings.purge` | `offering`, `confirmation_code` | destrutiva | sim |
+| `upload_question_bank` | `banks.upload` | `path` (o caminho absoluto da pasta do banco), `name` (de 3 a 40: letras minúsculas, dígitos e hífen), `git_rev` (opcional: a revisão do git local) | escrita | não |
+| `list_question_banks` | `banks.list` | `name` (opcional: o nome exato), `after` (opcional), `limit` (opcional) | leitura | não |
 
 Na `import_students`, o servidor lê o arquivo da lista (no mesmo formato do `cq students import`) e devolve só o
 resultado agregado; o conteúdo do arquivo não passa pelo modelo. A `create_offering` e a `update_offering_settings`
 não têm o e-mail de contato do professor (na API, um campo marcado como identidade): ele só é definido pelo CLI ou
 pela API.
+
+Na `upload_question_bank`, o servidor lê a pasta de curso do PrairieLearn (sem `git_rev`, como está; com `git_rev`,
+a árvore dessa pasta no commit da revisão, lida do repositório git local que a contém), confere as mesmas regras do
+`cq banks upload`, calcula a versão e envia o pacote; o conteúdo não passa pelo modelo. O `git_rev` aceita só letras,
+dígitos e os sinais `_ . / @ { } ~ ^ -`, sem começar por hífen, até 256 caracteres. Um `path` relativo, de rede (UNC)
+ou de dispositivo é recusado, como na `import_students`. Toda recusa local sai só com a mensagem fixa do motivo, sem
+nenhum caminho, nem o de um arquivo dentro do banco (o `cq banks upload` mostra esse caminho no terminal). O resultado
+é a resposta da API: o nome, a versão, a origem, o commit git, as contagens, `repo` (a referência `bank:<nome>` para
+o `prepare_dispatch`, com a versão no `commit`) e `created`. Reenviar o mesmo nome com a mesma versão devolve o
+primeiro envio, sem gravar nada de novo; por isso a ferramenta é marcada como idempotente. O guia
+[Banco de questões local](../operacao/banco-local.md) trata do uso.
 
 ## Ferramentas locais
 

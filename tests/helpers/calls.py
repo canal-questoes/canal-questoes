@@ -228,9 +228,27 @@
 # - `tests/helpers/canary.py` tem também as pessoas canário do expurgo (`PURGE_PREFIXES`), usadas pela
 #   semente do expurgo (`tests/helpers/purge.py`) na fase do expurgo do canário; as chamadas daqui usam as da API base.
 
+# Banco de questões local:
+# - `VALID_CALLS` das 2 operações novas (200 em ambas, repetíveis, sem semente): `banks.upload` envia o curso de
+#   fixture (`tests/fixtures/repos/course`, empacotado à mão por `tests/helpers/banks.py`, sem o `cq`) com o nome
+#   neutro `BANK_CALL_NAME`, a origem `folder`, `git_commit` nulo e a versão de referência (a 1ª chamada guarda a
+#   versão e grava um `bank.uploaded`; as seguintes devolvem a mesma versão, com `created` falso e sem evento);
+#   `banks.list` lista sem filtro. O corpo é montado uma vez e copiado a cada chamada.
+# - `CANARY_CALLS` das 2 operações novas, com o resultado exato de cada uma em `BANKS_CANARY_EXPECTED` (conferido
+#   com igualdade), todas recusadas antes de guardar qualquer coisa, nunca 409: `banks.upload`: `body_value` (o nome
+#   canário como `name`, com o resto do corpo válido) → 400 `[{name, invalid_format}]`, sem eco; `body_key` → 400
+#   `[{body, unknown_field}]`; `banks.list`: `query_value` (o nome canário em `name`) → 400 `[{name,
+#   invalid_format}]` e `query_value_after` (o nome canário em `after`) → 400 `[{after, invalid_format}]`; nas duas,
+#   `header_auth` → 401, `header_client` → 400 `[{X-CQ-Client, invalid_value}]` e `query_key` → 400 `[{query,
+#   unknown_field}]`. O envio confere o cabeçalho e a consulta antes da permissão e do corpo.
+# - `SQL_SCAN` com a tabela nova `question_banks`, com todas as colunas (o pacote guardado pela forma `escape`,
+#   como `media_blobs.data`); tem linha no canário (a `VALID_CALLS` do envio). Nenhuma coluna interna de identidade
+#   nova.
+
 from __future__ import annotations
 
 import contextlib
+import functools  # banco de questões local: o corpo do envio montado uma vez
 import io
 import itertools
 import urllib.parse
@@ -253,6 +271,7 @@ from tests.helpers.clock import FakeClock  # o relógio próprio da semente de r
 from tests.helpers.contract import assert_matches
 from tests.helpers.api import assert_matches_tolerant  # o `Offering` com `purged_at` tolerado na semente
 from tests.helpers.secrets import remember_secret
+from tests.helpers import banks as bank_fixtures  # banco de questões local: o pacote montado à mão
 
 _counter = itertools.count(1)
 
@@ -1656,6 +1675,90 @@ del _op
 assert {(c.op_id, c.surface) for c in CANARY_CALLS[-len(DOCTOR_PURGE_CANARY_EXPECTED):]} == set(DOCTOR_PURGE_CANARY_EXPECTED), (
     "chamada canário do expurgo sem resultado esperado")
 
+# Banco de questões local (ver o comentário do módulo): o corpo válido do envio, montado uma vez.
+BANK_CALL_NAME = "banco-sonda"
+BANKS_URL = "/v1/question-banks"
+
+
+@functools.lru_cache(maxsize=1)
+def _bank_call_template() -> tuple[tuple[str, Any], ...]:
+    files = bank_fixtures.course_files()
+    body = bank_fixtures.upload_body(BANK_CALL_NAME, bank_fixtures.reference_version(files), "folder", None,
+                                     bank_fixtures.archive_of(files))
+    return tuple(body.items())
+
+
+def _bank_call_body() -> dict:
+    """O corpo válido de `banks.upload` (uma cópia nova a cada chamada)."""
+    return dict(_bank_call_template())
+
+
+def _banks_upload(c: Any, s: CallState, h: dict, *, params: dict | None = None, json: Any = MISSING) -> Any:
+    return c.post(BANKS_URL, params=params, headers=h, **_body(_bank_call_body(), json))
+
+
+VALID_CALLS.update({
+    # Banco de questões local: o envio idempotente do curso de fixture e a listagem sem filtro
+    "banks.upload": _banks_upload,
+    "banks.list": lambda c, s, h, *, params=None, json=MISSING: _get(c, BANKS_URL, params, h, json),
+})
+
+
+def _bank_call(method: str, *, headers_of: Callable[[], dict] = lambda: ADMIN, params: dict | None = None,
+               body: Callable[[dict], Any] | None = None) -> Callable[[Any, CallState], Any]:
+    """`banks.upload` (`POST`, com o corpo válido trocado por `body(corpo_válido)`) ou `banks.list` (`GET`, sem
+    corpo), com os cabeçalhos de `headers_of()` e a consulta `params`."""
+    def run(c: Any, s: CallState) -> Any:
+        kwargs: dict[str, Any] = {"headers": headers_of()}
+        if params is not None:
+            kwargs["params"] = params
+        if method == "POST":
+            valid = _bank_call_body()
+            kwargs["json"] = valid if body is None else body(valid)
+        return c.request(method, BANKS_URL, **kwargs)
+    return run
+
+
+def _bank_global_calls(op_id: str, method: str) -> tuple[CanaryCall, ...]:
+    """as superfícies globais de `/v1` (`header_auth`, `header_client`, `query_key`) de uma operação dos bancos."""
+    return (
+        CanaryCall(op_id, "header_auth", _bank_call(method, headers_of=lambda: auth(ZEFIRO.ra))),
+        CanaryCall(op_id, "header_client", _bank_call(
+            method, headers_of=lambda: {**ADMIN, "X-CQ-Client": CANARY_ASCII})),
+        CanaryCall(op_id, "query_key", _bank_call(method, params={ZEFIRO.name: "1"})),
+    )
+
+
+CANARY_CALLS = CANARY_CALLS + (
+    # --- Banco de questões local (resultados em `BANKS_CANARY_EXPECTED`) ---
+    # banks.upload: o nome canário como `name` (fora do padrão do nome) e como chave do corpo
+    CanaryCall("banks.upload", "body_value", _bank_call("POST", body=lambda valid: {**valid, "name": ZEFIRO.name})),
+    CanaryCall("banks.upload", "body_key", _bank_call("POST", body=lambda valid: {**valid, ZEFIRO.name: ZEFIRO.ra})),
+    *_bank_global_calls("banks.upload", "POST"),
+    # banks.list: o nome canário no filtro do nome e no cursor
+    CanaryCall("banks.list", "query_value", _bank_call("GET", params={"name": ZEFIRO.name})),
+    CanaryCall("banks.list", "query_value_after", _bank_call("GET", params={"after": ZEFIRO.name})),
+    *_bank_global_calls("banks.list", "GET"),
+)
+
+# Banco de questões local: o resultado exato de cada chamada canário dessa parte, `(status, code, fields)`, com
+# `fields` = os pares `(field, reason)` no 400 e `None` no 401. A conferência é por igualdade.
+BANKS_CANARY_EXPECTED: dict[tuple[str, str], tuple[int, str, list[tuple[str, str]] | None]] = {
+    ("banks.upload", "body_value"): (400, "invalid_request", [("name", "invalid_format")]),
+    ("banks.upload", "body_key"): (400, "invalid_request", [("body", "unknown_field")]),
+    ("banks.list", "query_value"): (400, "invalid_request", [("name", "invalid_format")]),
+    ("banks.list", "query_value_after"): (400, "invalid_request", [("after", "invalid_format")]),
+}
+for _op in ("banks.upload", "banks.list"):
+    BANKS_CANARY_EXPECTED.update({
+        (_op, "header_auth"): (401, "unauthenticated", None),
+        (_op, "header_client"): (400, "invalid_request", _DOCTOR_PURGE_BAD_CLIENT),
+        (_op, "query_key"): (400, "invalid_request", _DOCTOR_PURGE_UNKNOWN_QUERY),
+    })
+del _op
+assert {(c.op_id, c.surface) for c in CANARY_CALLS[-len(BANKS_CANARY_EXPECTED):]} == set(BANKS_CANARY_EXPECTED), (
+    "chamada canário dos bancos sem resultado esperado")
+
 # Textos livres semeados no canário: só alvos inteiros, com fronteira, para que a
 # redação correta os troque por completo.
 SEEDED_FREE_TEXT = {
@@ -1783,6 +1886,12 @@ SQL_SCAN["invite_sends"] += ["batch_id::text"]
 # expurgado (fase do expurgo e `_api_phase`) e o 2º dos `purge_targets` (preparado e não expurgado).
 SQL_SCAN["offerings"] += ["purged_at::text", "purge_result::text", "purge_code_sha256",
                           "purge_code_expires_at::text", "purge_prepared_counts::text"]
+# Banco de questões local: a tabela nova `question_banks`, com todas as colunas (o pacote guardado pela forma
+# `escape`, como `media_blobs.data`). Tem linha no canário: a `VALID_CALLS` do envio guarda o curso de fixture.
+SQL_SCAN["question_banks"] = ["id::text", "bank_uuid::text", "name", "version", "source", "git_commit",
+                              "encode(archive, 'escape')", "archive_bytes::text", "file_count::text",
+                              "byte_count::text", "question_count::text", "actor_token_id::text",
+                              "created_at::text"]
 
 # Oferecimentos e bots: colunas internas de identidade (o id do chat e do
 # remetente do Telegram). Ficam fora de `SQL_SCAN` e da varredura genérica de `tg-id`; o canário as

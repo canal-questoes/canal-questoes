@@ -33,8 +33,8 @@ Há dois tipos de token:
 | `people:write` | cadastrar pessoas, importar a lista da turma e as duas fases do expurgo |
 | `identity:reveal` | revelar a identidade por trás de um pseudônimo |
 | `events:read` | ler o log de eventos |
-| `offerings:read` | consultar oferecimentos, bots, alunos, disparos, mensagens, relatórios, o resumo diário e o diagnóstico |
-| `offerings:write` | criar, configurar, encerrar e arquivar oferecimentos; links de equipe; convites; disparos; reenvio do resumo do relatório |
+| `offerings:read` | consultar oferecimentos, bots, alunos, disparos, mensagens, relatórios, o resumo diário, o diagnóstico e os bancos de questões enviados |
+| `offerings:write` | criar, configurar, encerrar e arquivar oferecimentos; links de equipe; convites; disparos; reenvio do resumo do relatório; envio de bancos de questões |
 | `bots:manage` | registrar e ativar o bot do oferecimento |
 | `tokens:manage` | criar, listar e revogar tokens |
 
@@ -56,6 +56,10 @@ Depois da autenticação e do roteamento (401, 404 e 405), cada rota sob `/v1` c
 3. as regras da operação (o recurso existe, o estado permite): 404 ou 409 (e, nas operações que falam com o
    Telegram, 503, ou 400 para o token de bot recusado).
 
+A exceção é o envio de um banco de questões (`banks.upload`), cujo corpo pode ter centenas de MB: ele confere o
+cabeçalho `X-CQ-Client` e a consulta, depois a permissão (403, sem ler o corpo) e só então o corpo (veja
+[o envio de um banco de questões](#o-envio-de-um-banco-de-questões)).
+
 ## Envelope de erro
 
 Todo erro sai no mesmo envelope JSON, descrito em
@@ -73,7 +77,9 @@ Todo erro sai no mesmo envelope JSON, descrito em
 
 - `code` e `message` sempre vêm; cada código tem uma mensagem fixa, em português, que nunca repete o valor enviado;
 - `fields` lista os campos com problema e o motivo de cada um (`missing`, `unknown_field`, `invalid_format`,
-  `too_short`, `too_long`, `too_few`, `too_many`, `out_of_range`, `invalid_value` ou `duplicate`);
+  `too_short`, `too_long`, `too_few`, `too_many`, `out_of_range`, `invalid_value`, `duplicate`, `too_large`,
+  `path_not_allowed`, `entry_not_allowed`, `not_a_course` ou `mismatch`; os cinco últimos só aparecem no envio de
+  um banco de questões, descritos [na seção dele](#o-envio-de-um-banco-de-questões));
 - `permission` diz a permissão que faltou (no 403);
 - `state` diz o estado atual do oferecimento (no `invalid_state`): `draft`, `active`, `closed` ou `archived`;
 - `pending` traz as contagens do trabalho pendente (no `purge_pending`).
@@ -104,8 +110,8 @@ Todo erro sai no mesmo envelope JSON, descrito em
 
 ## Listas e paginação
 
-As listas paginadas (`people.list`, `events.list`, `offerings.list`, `dispatches.list`, `messages.list` e
-`reports.list_versions`) aceitam, na consulta, `after` (o cursor: só os itens depois dele; padrão 0) e `limit` (de 1 a
+As listas paginadas (`people.list`, `events.list`, `offerings.list`, `dispatches.list`, `messages.list`,
+`reports.list_versions` e `banks.list`) aceitam, na consulta, `after` (o cursor: só os itens depois dele; padrão 0) e `limit` (de 1 a
 500; padrão 100). A resposta traz `items` e `next_cursor`, o valor a passar em `after` para buscar a página seguinte:
 o cursor do último item da página ou, numa página sem itens, o próprio `after` recebido, o que marca o fim da lista.
 No esquema da resposta de `reports.list_versions`, `next_cursor` também admite nulo. O `tokens.list` não é paginado:
@@ -166,13 +172,68 @@ arquivos a operação tem em [`contracts/api/v1/schemas/`](../../contracts/api/v
 | `system.doctor` | `GET /v1/system/doctor` | `offerings:read` | resposta |
 | `offerings.prepare_purge` | `POST /v1/offerings/{ref}/purge/prepare` | `people:write` | resposta |
 | `offerings.purge` | `POST /v1/offerings/{ref}/purge` | `people:write` | pedido e resposta |
+| `banks.upload` | `POST /v1/question-banks` | `offerings:write` | pedido e resposta |
+| `banks.list` | `GET /v1/question-banks` | `offerings:read` | resposta |
 
 Algumas consultas próprias:
 
 - `events.list`: `types` (repetível: um ou mais tipos de evento) e `person` (o apelido ou o identificador da pessoa);
   ao menos um dos dois é obrigatório;
 - `reports.get`: `format` (`json`, o padrão, ou `csv`) e `version` (um número ou `latest`; sem ela, o relatório é
-  calculado na hora). No formato CSV, os erros continuam saindo no envelope JSON.
+  calculado na hora). No formato CSV, os erros continuam saindo no envelope JSON;
+- `banks.list`: `name` (opcional, um só: o nome exato do banco, no mesmo padrão do envio; fora dele,
+  `invalid_format`). A lista traz uma linha por versão enviada, em ordem do primeiro envio.
+
+## O envio de um banco de questões
+
+`banks.upload` recebe um banco de questões local, uma pasta de curso do PrairieLearn empacotada pelo cliente, e o
+guarda para os disparos. O `cq banks upload` e a ferramenta `upload_question_bank` do MCP leem a pasta, conferem as
+regras, calculam a versão e montam o pacote antes do pedido; o guia
+[Banco de questões local](../operacao/banco-local.md) trata do uso.
+
+O corpo é JSON, com no máximo 188743680 bytes (180 MiB), conferido pelo `Content-Length` antes da leitura e pelo
+contador durante ela (acima do teto, `body` com `too_long`; um `Content-Length` repetido ou não numérico, `body` com
+`invalid_format`). A API trata um envio por vez; o segundo espera. Os campos:
+
+| Campo | O que é |
+| --- | --- |
+| `name` | o nome do banco: de 3 a 40 caracteres, letras minúsculas, dígitos e hífen, começando por letra ou dígito |
+| `version` | a versão declarada: o SHA-256 do conteúdo, em 64 dígitos hexadecimais minúsculos |
+| `source` | a origem: `folder` (a pasta como está) ou `git` (um commit de um repositório git local) |
+| `git_commit` | o commit de origem (40 ou 64 dígitos hexadecimais): obrigatório com `git`; ausente ou nulo com `folder` |
+| `archive` | o pacote `.tar.gz` em base64 padrão, com preenchimento; decodificado, no máximo 134217728 bytes (128 MiB) |
+
+A API confere o pacote inteiro: um `.tar.gz` só com arquivos regulares, de até 20000 arquivos e 100 MiB de conteúdo,
+com caminhos relativos e o `infoCourse.json` na raiz. Depois recalcula a versão pelo conteúdo recebido. Cada recusa
+sai como `invalid_request`, com um único campo:
+
+| Campo e motivo | Quando |
+| --- | --- |
+| `archive` com `invalid_format` | o base64 é inválido ou o pacote está malformado |
+| `archive` com `too_long` | o pacote decodificado passa de 128 MiB |
+| `archive` com `too_large` | o conteúdo passa de 100 MiB (ou o pacote descomprimido, ou um cabeçalho estendido, passa do teto) |
+| `archive` com `too_many` | o pacote passa de 20000 arquivos |
+| `archive` com `entry_not_allowed` | um membro do pacote não é um arquivo regular (link, diretório, dispositivo), ou um cabeçalho estendido tem uma chave fora da lista aceita |
+| `archive` com `path_not_allowed` | um caminho está fora da regra: absoluto, com um componente vazio, `.`, `..` ou `.git` (em qualquer caixa), com barra invertida ou caractere de controle, fora de UTF-8, longo demais (mais de 255 bytes num componente ou 4096 no caminho), ou um arquivo com o nome de uma pasta |
+| `archive` com `duplicate` | o mesmo caminho aparece duas vezes |
+| `archive` com `not_a_course` | falta o `infoCourse.json` na raiz do banco |
+| `version` com `mismatch` | a versão recalculada pelo conteúdo difere da declarada |
+
+Os demais campos seguem as regras de sempre: `missing`, `invalid_format`, `too_short` e `too_long` no `name`;
+`missing` e `invalid_format` na `version`; `missing` e `invalid_value` na `source`; no `git_commit`, `missing` com a
+origem `git`, `invalid_format` fora da forma e `invalid_value` com a origem `folder` e um valor não nulo.
+
+O sucesso é sempre 200. A resposta traz o nome, a versão, a origem, o commit git (ou nulo), as contagens (arquivos,
+bytes e questões), o horário do primeiro envio, `repo` (a referência `bank:<nome>` a usar no preparo do disparo) e
+`created`: `true` no primeiro envio desse nome com essa versão; `false` num reenvio, que devolve o primeiro envio
+(a origem e o commit dele) sem gravar nada de novo. Uma versão enviada não muda depois.
+
+O primeiro envio registra o evento `bank.uploaded` no log de eventos, com o nome, a versão, a origem, o commit e as
+contagens.
+
+No `dispatches.prepare`, o `repo` pode ser essa referência `bank:<nome>`, com a versão do banco (64 dígitos
+hexadecimais) no `commit`; ela não passa pela lista de hosts permitidos. Uma referência `bank:` fora do padrão do
+nome é `invalid_format`. O preparo não confere se o banco existe: quem confere é a validação do disparo, no worker.
 
 ## Duas fases
 

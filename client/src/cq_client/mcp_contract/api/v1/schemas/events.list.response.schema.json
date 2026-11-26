@@ -3135,6 +3135,85 @@
                 }
               }
             }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "seq",
+              "type",
+              "occurred_at",
+              "actor_token_id",
+              "data"
+            ],
+            "properties": {
+              "seq": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "type": {
+                "const": "bank.uploaded"
+              },
+              "occurred_at": {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,6})?Z$"
+              },
+              "actor_token_id": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "pattern": "^(bootstrap|[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$"
+              },
+              "data": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "bank",
+                  "version",
+                  "source",
+                  "git_commit",
+                  "file_count",
+                  "byte_count",
+                  "question_count"
+                ],
+                "properties": {
+                  "bank": {
+                    "type": "string",
+                    "x-free-text": true
+                  },
+                  "version": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{64}$"
+                  },
+                  "source": {
+                    "enum": [
+                      "folder",
+                      "git"
+                    ]
+                  },
+                  "git_commit": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "pattern": "^([0-9a-f]{40}|[0-9a-f]{64})$"
+                  },
+                  "file_count": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "byte_count": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "question_count": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                }
+              }
+            }
           }
         ]
       }

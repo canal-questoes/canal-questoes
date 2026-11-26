@@ -14,19 +14,19 @@ Para aprender a usar o sistema desde o começo, siga o [tutorial](../tutorial/pr
 | Página | O que tem |
 | --- | --- |
 | [CLI (`cq`)](cli.md) | como rodar o `cq`; as opções globais; o arquivo de perfis e as variáveis de ambiente do cliente; os códigos de saída; cada comando do catálogo e cada comando local |
-| [API HTTP](api.md) | o endereço, a autenticação por token e as permissões; o envelope de erro; a paginação; a tabela das 39 operações, com o método, a rota, a permissão e os esquemas; o `/openapi.json` |
-| [Servidor MCP](mcp.md) | como o `cq mcp` serve as ferramentas a um agente; as 36 ferramentas; as que pedem a aprovação do operador; as 8 operações que ficam fora do MCP e por quê |
+| [API HTTP](api.md) | o endereço, a autenticação por token e as permissões; o envelope de erro; a paginação; a tabela das 41 operações, com o método, a rota, a permissão e os esquemas; o `/openapi.json` |
+| [Servidor MCP](mcp.md) | como o `cq mcp` serve as ferramentas a um agente; as 38 ferramentas; as que pedem a aprovação do operador; as 8 operações que ficam fora do MCP e por quê |
 | [Tipos de questão](tipos-de-questao.md) | as questões do PrairieLearn aceitas; os 5 elementos de resposta e os elementos auxiliares; as recusas da inspeção; a vírgula decimal |
 
 ## Uma operação, três portas de entrada
 
-O sistema tem um catálogo único de operações, [`catalog.json`](../../contracts/api/v1/catalog.json), com 39
+O sistema tem um catálogo único de operações, [`catalog.json`](../../contracts/api/v1/catalog.json), com 41
 operações. Cada operação tem:
 
 - um identificador, como `offerings.create`;
 - uma rota HTTP e a permissão que o token precisa ter para chamá-la;
 - um comando do `cq`, como `cq offerings create`;
-- uma ferramenta do servidor MCP, em 31 das 39. As outras 8 ficam fora do MCP de propósito: passariam ao modelo um
+- uma ferramenta do servidor MCP, em 33 das 41. As outras 8 ficam fora do MCP de propósito: passariam ao modelo um
   segredo, uma credencial, uma identidade ou texto livre de aluno; são a gestão de tokens, que fica fora do agente (só
   no CLI e na API); ou são um diagnóstico, que no MCP fica com a `run_doctor`. A
   [página do MCP](mcp.md#operações-fora-do-mcp) diz o motivo de cada uma.

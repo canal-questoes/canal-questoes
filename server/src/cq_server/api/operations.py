@@ -82,6 +82,12 @@ _REPORT_VERSION = {
     "description": "Versão congelada (número ou `latest`); ausente: o cálculo no momento.",
     "schema": {"type": "string", "pattern": "^([1-9][0-9]{0,9}|latest)$"},
 }
+# O filtro da listagem dos bancos: o nome exato (o mesmo padrão do nome no envio).
+_BANK_NAME = {
+    "name": "name", "in": "query", "required": False,
+    "description": "Nome exato do banco (minúsculas, dígitos e hífen; de 3 a 40).",
+    "schema": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]{2,39}$"},
+}
 _CLIENT = {
     "name": CLIENT_HEADER, "in": "header", "required": False,
     "description": f"Cliente declarado (padrão `{DEFAULT_CLIENT}`).",
@@ -251,6 +257,12 @@ OPERATIONS: tuple[Operation, ...] = (
               request_model=schemas.PurgeConfirmation,
               errors=(*_V1, "not_found", "invalid_state", "purge_pending", "invalid_confirmation",
                       "purge_changed")),
+    # Banco de questões local, no fim do catálogo: o envio (idempotente) e a listagem
+    Operation("banks.upload", "POST", "/v1/question-banks", Permission.OFFERINGS_WRITE,
+              "Enviar um banco de questões local (pasta ou commit de um git local)",
+              request_model=schemas.BankUploadRequest, errors=_V1),
+    Operation("banks.list", "GET", "/v1/question-banks", Permission.OFFERINGS_READ,
+              "Listar os bancos de questões enviados", parameters=(_AFTER, _LIMIT, _BANK_NAME), errors=_V1),
 )
 
 BY_ID: dict[str, Operation] = {op.id: op for op in OPERATIONS}

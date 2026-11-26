@@ -57,7 +57,7 @@ from cq_server.ports.engine import (
     Variant,
 )
 from cq_server.ports.repos import Fetched, FetchNotFound, FetchRefused, FetchTemporaryFailure, RepoFetcher
-from cq_server.redaction import KnownIdentity, redact
+from cq_server.redaction import KnownIdentity, redact, redact_operator_text
 from cq_server.tasks import ClaimedTask, PermanentTaskError
 
 __all__ = [
@@ -451,10 +451,9 @@ def _redact_text(value: Any, identities: Sequence[KnownIdentity], secrets: Seque
 def _redact_operator_text(value: str, identities: Sequence[KnownIdentity], secrets: Sequence[str | None]) -> str:
     """`repo` e `qid` na saída: a redação de sempre e, por serem caminhos
     (`https://host/<RA>/<parte local>.git`), também a parte local do e-mail de cada pessoa como alvo extra,
-    com a mesma fronteira por classe do nome. Os valores gravados ficam literais (a chave da obtenção)."""
-    extra = [KnownIdentity(alias=identity.alias, full_name=identity.email.split("@", 1)[0], ra=None, email=None)
-             for identity in identities if identity.email and identity.email.split("@", 1)[0]]
-    return redact(value, [*identities, *extra], secrets=secrets)
+    com a mesma fronteira por classe do nome (`redaction.redact_operator_text`). Os valores gravados ficam
+    literais (a chave da obtenção)."""
+    return redact_operator_text(value, identities, secrets=secrets)
 
 
 def _redact_preview(preview: Mapping[str, Any] | None, identities: Sequence[KnownIdentity],

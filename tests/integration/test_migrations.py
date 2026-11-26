@@ -84,6 +84,13 @@ nova. A função não enumera CHECKs: o `DEFAULT true` e os dois CHECKs (`id` se
 `result`) ficam em `test_migration_0007.py`. A `0007` é real no
 esqueleto (o esquema é contrato), então as duas comparações passam já no esqueleto.
 
+Banco de questões local (acréscimo):
+o esquema esperado ganha a tabela `question_banks` (os pacotes enviados, uma linha por nome e versão), com
+`id` identity e chave primária, `bank_uuid` único, a unicidade `(name, version)` e nenhuma FK; só
+`git_commit` e `actor_token_id` são anuláveis. A função não enumera CHECKs: os da tabela e o
+`events_type_check` com o tipo novo ficam em `test_migration_0008.py`. A `0008` é real no esqueleto (o
+esquema é contrato), então as comparações passam já no esqueleto.
+
 """
 
 from __future__ import annotations
@@ -514,6 +521,23 @@ EXPECTED_COLUMNS: dict[str, dict[str, tuple[str, bool]]] = {
         "result": ("text", False),
         "checked_at": ("timestamptz", False),
     },
+    # Banco de questões local (acréscimo): os pacotes enviados, imutáveis. Os CHECKs ficam em
+    # `test_migration_0008.py`.
+    "question_banks": {
+        "id": ("int8", False),
+        "bank_uuid": ("uuid", False),
+        "name": ("text", False),
+        "version": ("text", False),
+        "source": ("text", False),
+        "git_commit": ("text", True),
+        "archive": ("bytea", False),
+        "archive_bytes": ("int8", False),
+        "file_count": ("int4", False),
+        "byte_count": ("int8", False),
+        "question_count": ("int4", False),
+        "actor_token_id": ("uuid", True),
+        "created_at": ("timestamptz", False),
+    },
 }
 
 # as colunas "bigint identity".
@@ -547,6 +571,8 @@ IDENTITY_COLUMNS = {
     ("dispatch_previews", "id"),
     ("offering_digests", "id"),
     ("invite_batches", "id"),
+    # Banco de questões local: o `id` é o cursor da listagem.
+    ("question_banks", "id"),
 }
 
 EXPECTED_PRIMARY_KEYS = {
@@ -587,6 +613,8 @@ EXPECTED_PRIMARY_KEYS = {
     "invite_batches": ("id",),
     # Implantação e piloto (acréscimo): a linha única pelo `id` (boolean, sempre true).
     "mail_probe": ("id",),
+    # Banco de questões local (acréscimo).
+    "question_banks": ("id",),
 }
 
 EXPECTED_UNIQUE_COLUMNS = {
@@ -623,6 +651,8 @@ EXPECTED_UNIQUE_COLUMNS = {
     ("dispatch_previews", "button_token"),
     ("offering_digests", "offering_id"),
     ("invite_batches", "batch_uuid"),
+    # Banco de questões local: o identificador externo, reservado.
+    ("question_banks", "bank_uuid"),
 }
 
 # Oferecimentos e bots: as unicidades de várias colunas sobre a tabela inteira (sem
@@ -638,6 +668,8 @@ EXPECTED_MULTI_COLUMN_UNIQUES = {
     # disparo) e `team_notices_subject_key` (a idempotência do aviso).
     ("dispatch_reports", frozenset({"dispatch_id", "version"})),
     ("team_notices", frozenset({"offering_id", "kind", "subject_key"})),
+    # Banco de questões local: uma linha por nome e versão (o primeiro envio vence).
+    ("question_banks", frozenset({"name", "version"})),
 }
 
 # Oferecimentos e bots: os índices únicos parciais (com predicado): no máximo um convite

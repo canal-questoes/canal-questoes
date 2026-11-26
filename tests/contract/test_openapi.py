@@ -88,6 +88,9 @@ REQUEST_OPS += ("offerings.update_digest",)
 # CLI: só a confirmação do expurgo tem corpo (`{confirmation_code}`); o `doctor` e a
 # preparação do expurgo são sem corpo.
 REQUEST_OPS += ("offerings.purge",)
+# Banco de questões local: só o envio tem corpo (o pacote em base64 com o nome, a versão e a origem); a
+# listagem é sem corpo.
+REQUEST_OPS += ("banks.upload",)
 
 # Parâmetros de caminho e de consulta de cada operação. Cabeçalhos ficam de fora.
 EXPECTED_PARAMETERS: dict[str, set[tuple[str, str]]] = {op_id: set() for op_id in OP_IDS} | {
@@ -135,6 +138,8 @@ EXPECTED_PARAMETERS: dict[str, set[tuple[str, str]]] = {op_id: set() for op_id i
 }
 # CLI: `events.list` tem o parâmetro de consulta `person` (opcional).
 EXPECTED_PARAMETERS["events.list"] = EXPECTED_PARAMETERS["events.list"] | {("query", "person")}
+# Banco de questões local: o envio sem parâmetro; a listagem com a paginação e o filtro pelo nome exato.
+EXPECTED_PARAMETERS["banks.list"] = {("query", "after"), ("query", "limit"), ("query", "name")}
 
 # Marcas nas respostas, exatamente como no contrato: (operação, status, caminho, marca).
 EXPECTED_RESPONSE_MARKS = {
@@ -197,6 +202,13 @@ EXPECTED_RESPONSE_MARKS |= {("reports.get", "200", path, "x-untrusted") for path
 # oferecimento sai como `OfferingRef`; o `confirmation_code` do expurgo não é segredo), e o `purged_at` do
 # `Offering` não tem marca: o conjunto não ganha nenhuma tupla, e as 3 operações entram na comparação exata de
 # `test_response_markers_exactly_as_contract` pelo laço do catálogo.
+# Banco de questões local: o nome do banco e o `repo` (a referência do banco) são texto livre do operador,
+# na resposta do envio e em cada item da listagem; no evento `bank.uploaded`, o nome do banco (o campo `bank`).
+EXPECTED_RESPONSE_MARKS |= {("banks.upload", "200", "name", "x-free-text"),
+                            ("banks.upload", "200", "repo", "x-free-text"),
+                            ("banks.list", "200", "items[].name", "x-free-text"),
+                            ("banks.list", "200", "items[].repo", "x-free-text"),
+                            ("events.list", "200", "items[].data.bank", "x-free-text")}
 # Relatórios: o esquema da mídia CSV do 200 de `reports.get`.
 REPORT_CSV_SCHEMA = {"type": "string", "x-free-text": True, "x-untrusted": True}
 

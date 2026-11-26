@@ -14,6 +14,11 @@ Expurgo: `purge_pending` e `purge_changed` (409), sem `fields`, `state`
 nem `permission`; `pending` (as 5 contagens do trabalho pendente, `purge.PurgePending`) obrigatório no
 `purge_pending` (`PENDING_CODES`) e proibido nos demais códigos.
 
+Banco de questões local: as recusas do envio são `invalid_request` com um campo, sem código novo; os motivos
+`too_large`, `path_not_allowed`, `entry_not_allowed`, `not_a_course` (no `archive`) e `mismatch` (na
+`version`) se somam aos de sempre, e o corpo acima do teto é `{body, too_long}` (400, sem 413). Nenhuma recusa
+leva o nome de um arquivo, o conteúdo do pacote ou o texto da exceção da leitura.
+
 As mensagens são fixas e **nunca** ecoam valores enviados: nenhum erro carrega texto vindo
 do pedido, só nomes de campo do esquema, motivos do contrato e o estado do oferecimento.
 """

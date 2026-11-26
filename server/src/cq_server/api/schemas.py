@@ -997,6 +997,24 @@ class OfferingPurgedData(StrictModel):
     contact_email_deleted: bool
 
 
+# O banco de questões local: os formatos comuns ao evento e às respostas.
+BankVersionHash = Annotated[str, Field(pattern=r"^[0-9a-f]{64}$")]
+BankSource = Literal["folder", "git"]
+BankCommit = Annotated[str, Field(pattern=r"^([0-9a-f]{40}|[0-9a-f]{64})$")]
+
+
+# O banco enviado: o nome do banco no campo `bank` (texto livre do operador, redigido), a versão, a origem e
+# as contagens.
+class BankUploadedData(StrictModel):
+    bank: FreeText
+    version: BankVersionHash
+    source: BankSource
+    git_commit: BankCommit | None
+    file_count: Count
+    byte_count: Count
+    question_count: Count
+
+
 class _EventBase(StrictModel):
     seq: Annotated[int, Field(ge=1)]
     occurred_at: Timestamp
@@ -1252,6 +1270,11 @@ class OfferingPurgedEvent(_EventBase):
     data: OfferingPurgedData
 
 
+class BankUploadedEvent(_EventBase):
+    type: Literal["bank.uploaded"]
+    data: BankUploadedData
+
+
 Event = Annotated[
     Union[PersonRegisteredEvent, TokenCreatedEvent, TokenRevokedEvent, IdentityRevealedEvent,
           IdentityRevealDeniedEvent, TaskFailedEvent, OutboxFailedEvent,
@@ -1274,7 +1297,9 @@ Event = Annotated[
           # Relatórios e avisos
           ReportFrozenEvent, NoticeRecordedEvent, OfferingDigestChangedEvent,
           # Expurgo
-          OfferingPurgePreparedEvent, OfferingPurgedEvent],
+          OfferingPurgePreparedEvent, OfferingPurgedEvent,
+          # Banco de questões local
+          BankUploadedEvent],
     Field(discriminator="type"),
 ]
 EVENT_ADAPTER: TypeAdapter[Any] = TypeAdapter(Event)
@@ -1649,6 +1674,53 @@ class OfferingDigestUpdate(StrictModel):
         default=None, description="Horário local `HH:MM` (00:00 a 23:59) no fuso do oferecimento; ausente: não muda.")
 
 
+# --- banco de questões local --------------------------------------------------------------------
+
+BankName = Annotated[str, Field(min_length=3, max_length=40, pattern=r"^[a-z0-9][a-z0-9-]{2,39}$")]
+# O pacote `.tar.gz` em base64 padrão (com preenchimento); o teto é o base64 de 128 MiB.
+BankArchiveText = Annotated[str, Field(min_length=4, max_length=178956972, pattern=r"^[A-Za-z0-9+/]*={0,2}$")]
+
+
+class BankUploadRequest(StrictModel):
+    """Pedido de `banks.upload`: plano e fechado; `git_commit` obrigatório na origem `git` e nulo (ou
+    ausente) na origem `folder`."""
+
+    name: BankName = Field(description="Nome do banco (minúsculas, dígitos e hífen; de 3 a 40).")
+    version: BankVersionHash = Field(description="Versão declarada: o SHA-256 do manifesto do conteúdo.")
+    source: BankSource = Field(description="Origem: `folder` (uma pasta) ou `git` (um commit de um git local).")
+    git_commit: BankCommit | None = Field(
+        default=None, description="Commit de origem (40 ou 64 dígitos hexadecimais); só na origem `git`.")
+    archive: BankArchiveText = Field(description="O pacote `.tar.gz` em base64 padrão.")
+
+
+class BankVersion(StrictModel):
+    """Uma versão guardada de um banco: o nome e o `repo` redigidos na saída; a origem e o commit são os do
+    primeiro envio."""
+
+    name: OperatorText
+    version: BankVersionHash
+    repo: OperatorText
+    source: BankSource
+    git_commit: BankCommit | None
+    file_count: Annotated[int, Field(ge=1, le=20000)]
+    byte_count: Annotated[int, Field(ge=0, le=104857600)]
+    question_count: Annotated[int, Field(ge=0, le=20000)]
+    created_at: Timestamp
+
+
+class BankUploadResult(BankVersion):
+    """Resposta de `banks.upload`: a versão guardada e se este pedido a criou."""
+
+    created: bool
+
+
+class BanksPage(StrictModel):
+    """Resposta de `banks.list`."""
+
+    items: list[BankVersion]
+    next_cursor: Cursor
+
+
 # --- erros ---------------------------------------------------------------------------------------
 
 ErrorCode = Literal["invalid_request", "unauthenticated", "forbidden", "not_found",
@@ -1663,7 +1735,9 @@ ErrorCode = Literal["invalid_request", "unauthenticated", "forbidden", "not_foun
                     # Expurgo
                     "purge_pending", "purge_changed"]
 Reason = Literal["missing", "unknown_field", "invalid_format", "too_short", "too_long", "too_few",
-                 "too_many", "out_of_range", "invalid_value", "duplicate"]
+                 "too_many", "out_of_range", "invalid_value", "duplicate",
+                 # Banco de questões local
+                 "too_large", "path_not_allowed", "entry_not_allowed", "not_a_course", "mismatch"]
 
 
 class FieldError(StrictModel):
@@ -1713,4 +1787,6 @@ REQUEST_MODELS: tuple[type[StrictModel], ...] = (PersonRegistration, RevealReque
                                                  # Configuração das mensagens livres
                                                  OfferingSettingsUpdate,
                                                  # Resumo diário
-                                                 OfferingDigestUpdate)
+                                                 OfferingDigestUpdate,
+                                                 # Banco de questões local
+                                                 BankUploadRequest)

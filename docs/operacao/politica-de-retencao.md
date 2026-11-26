@@ -42,6 +42,12 @@ O banco do Postgres da pilha guarda a identidade de cada oferecimento até o exp
 - **Limite.** O expurgo é completo só no banco vivo: as cópias físicas que o Postgres ainda não reaproveitou
   ficam fora do alcance, e os backups anteriores ao expurgo continuam com o banco inteiro (ver as duas seções
   seguintes).
+- **Bancos de questões enviados.** Um banco de questões enviado pelo `cq banks upload` (o pacote, o nome, a versão e
+  as contagens) fica guardado no banco do Postgres enquanto o sistema existir, como as árvores dos repositórios git
+  que o `worker` guarda no volume `repos`; a árvore que o `worker` monta a partir do pacote para o motor também fica
+  nesse volume. Cada nome e versão é imutável, e nesta versão não há remoção de um banco enviado, nem pelo CLI, nem
+  pelo agente. O pacote é conteúdo de curso, sem identidade de aluno, e o expurgo de um oferecimento não o apaga; o
+  `cq banks list` mostra os bancos guardados.
 
 ## Dumps na VM
 
@@ -50,7 +56,7 @@ na VM.
 
 - **Prazo:** **7 dias** (configurável). A própria rotina apaga os dumps mais antigos a cada execução.
 - Cada dump leva o banco inteiro, inclusive as identidades dos oferecimentos ainda não expurgados no momento
-  do dump. Um expurgo não altera os dumps já tirados: a identidade expurgada some da VM quando o último dump anterior
+  do dump e os bancos de questões enviados até ele. Um expurgo não altera os dumps já tirados: a identidade expurgada some da VM quando o último dump anterior
   ao expurgo sai da rotação, em até 7 dias.
 - **Perda máxima.** Com um dump por dia, a perda da VM perde **até ~24 h** de respostas (um dia de disparos).
   Para encurtar essa janela, o plano de disparos manda o backup manual e a cópia no Windows depois de cada sessão

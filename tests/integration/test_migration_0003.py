@@ -322,24 +322,26 @@ def test_expected_version_and_migration_files_are_packaged() -> None:
     migração nova `0003_student_enrollment.sql` (vínculo do aluno);
     migração nova `0004_dispatch_response.sql` (disparo); migração
     nova `0005_reports_notices.sql` (relatórios); migração nova
-    `0006_cli_purge.sql` (CLI); migração nova `0007_mail_probe.sql` (implantação;
-    `EXPECTED_VERSION = "0007"`): a versão esperada é `0007`, e o pacote tem exatamente os sete
-    arquivos, em ordem."""
+    `0006_cli_purge.sql` (CLI); migração nova `0007_mail_probe.sql` (implantação); migração nova
+    `0008_question_banks.sql` (banco de questões; `EXPECTED_VERSION = "0008"`): a versão esperada é
+    `0008`, e o pacote tem exatamente os oito arquivos, em ordem."""
     # A versão do esquema é literal global; cada migração tem o seu arquivo no pacote:
     # a `0004` (disparo e resposta), com o arquivo `0004_dispatch_response.sql`;
     # a `0005` (relatórios e acompanhamento),
     # com o arquivo `0005_reports_notices.sql`;
     # a `0006` (CLI),
     # com o arquivo `0006_cli_purge.sql`;
-    # e a `0007` (implantação e piloto), a versão atual,
-    # com o arquivo `0007_mail_probe.sql`.
-    assert EXPECTED_VERSION == "0007"
+    # a `0007` (implantação e piloto),
+    # com o arquivo `0007_mail_probe.sql`;
+    # e a `0008` (banco de questões local), a versão atual,
+    # com o arquivo `0008_question_banks.sql`.
+    assert EXPECTED_VERSION == "0008"
     root = importlib.resources.files("cq_server.migrations")
     names = sorted(entry.name for entry in root.iterdir()
                    if entry.is_file() and entry.name.endswith(".sql"))
     assert names == ["0001_initial.sql", "0002_offerings_bots.sql", "0003_student_enrollment.sql",
                      "0004_dispatch_response.sql", "0005_reports_notices.sql", "0006_cli_purge.sql",
-                     "0007_mail_probe.sql"]
+                     "0007_mail_probe.sql", "0008_question_banks.sql"]
 
 
 def test_0003_adds_exactly_the_new_table_and_columns(empty_db_url: str) -> None:
@@ -471,10 +473,10 @@ def test_0003_over_offering_bot_database_preserves_rows_and_sequences(empty_db_u
     """Nova migração versionada, aplicada como na API base; colunas novas anuláveis
     (para os dados anteriores): um banco em `0002` (só `0001` e `0002`
     aplicadas) com dados de oferecimentos e bots recebe a `0003` pela função do sistema, que devolve `["0003", "0004",
-    "0005", "0006", "0007"]` (a `0004` do disparo, a `0005` dos relatórios, a `0006` do CLI
-    e a `0007` da implantação); cada linha já existente fica igual em todas as colunas que já tinha,
+    "0005", "0006", "0007", "0008"]` (a `0004` do disparo, a `0005` dos relatórios, a `0006` do CLI,
+    a `0007` da implantação e a `0008` do banco de questões); cada linha já existente fica igual em todas as colunas que já tinha,
     as colunas novas ficam nulas nas linhas antigas, `invite_sends` nasce vazia,
-    `schema_migrations` ganha a `0003`, a `0004`, a `0005`, a `0006` e a `0007`, as sequências
+    `schema_migrations` ganha a `0003`, a `0004`, a `0005`, a `0006`, a `0007` e a `0008`, as sequências
     continuam depois do maior id e aplicar de novo não muda nada."""
     assert apply_up_to(empty_db_url, "0002") == ["0001", "0002"]
     with psycopg.connect(empty_db_url, autocommit=True) as conn:
@@ -488,10 +490,11 @@ def test_0003_over_offering_bot_database_preserves_rows_and_sequences(empty_db_u
 
     # A função do sistema aplica também as migrações seguintes:
     # a `0004` (disparo), a `0005` (relatórios),
-    # a `0006` (CLI)
-    # e a `0007` (implantação).
-    assert apply_migrations(empty_db_url) == ["0003", "0004", "0005", "0006", "0007"]
-    assert current_version(empty_db_url) == "0007"
+    # a `0006` (CLI),
+    # a `0007` (implantação)
+    # e a `0008` (banco de questões).
+    assert apply_migrations(empty_db_url) == ["0003", "0004", "0005", "0006", "0007", "0008"]
+    assert current_version(empty_db_url) == "0008"
 
     with psycopg.connect(empty_db_url, autocommit=True) as conn:
         after = {table: _snapshot(conn, table, columns) for table, columns in OFFERING_BOT_COLUMNS.items()}
@@ -499,7 +502,7 @@ def test_0003_over_offering_bot_database_preserves_rows_and_sequences(empty_db_u
             k: v for k, v in before.items() if k != "schema_migrations"}
         assert after["schema_migrations"][:2] == before["schema_migrations"]
         assert [row[0] for row in after["schema_migrations"]] == ["0001", "0002", "0003", "0004",
-                                                                  "0005", "0006", "0007"]
+                                                                  "0005", "0006", "0007", "0008"]
         assert conn.execute(
             "SELECT terms_version, terms_accepted_at FROM enrollments ORDER BY id").fetchall() == [
             (None, None)] * 3

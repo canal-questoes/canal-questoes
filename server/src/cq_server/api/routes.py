@@ -22,7 +22,10 @@ Disparos: `dispatches.prepare` (404 do oferecimento → `invalid_state` →
 (404 → 404 → `invalid_dispatch_state`), `dispatches.list` e `messages.list` (404 do oferecimento, em
 qualquer estado); no arquivamento, `grading_pending` depois de `invalid_state`. O preparo recusa
 o host fora de `RepoSettings.allowed_hosts` (do `create_app`; a lista vazia recusa tudo) com
-`invalid_value`, e os horários sem deslocamento com `invalid_format`, sem eco. `repo`, `qid`, a prévia,
+`invalid_value`, e os horários sem deslocamento com `invalid_format`, sem eco. Uma referência `bank:<nome>`
+(um banco enviado) não passa pela lista de hosts e leva a versão do banco (64 hexadecimais) no `commit`; a
+forma `bank:` fora do padrão é `invalid_format`, e o preparo não confere se o banco existe (a validação do
+disparo confere). `repo`, `qid`, a prévia,
 os motivos do motor e as mensagens livres saem redigidos com as identidades do momento.
 
 Relatórios: `reports.get` e `reports.list_versions` (404 do oferecimento → 404 do
@@ -39,6 +42,17 @@ levam só contagens, estados e horários. `system.doctor`: sem consulta e sem co
 `offerings:read`, só leitura numa transação (`in_transaction`), sem evento e sem chamada externa; os limites são
 os do `DoctorSettings` dado a `create_app`.
 
+Banco de questões local: `banks.upload` (`POST /v1/question-banks`, com `offerings:write`) e `banks.list`
+(`GET /v1/question-banks`, com `offerings:read`; `after`, `limit` e `name` na consulta). O envio é a única rota
+com a permissão antes da forma do corpo, que ela lê em fluxo, com teto, nesta ordem: `X-CQ-Client` e consulta
+(400) → permissão (403, sem ler o corpo) → `Content-Length` (não numérico → `{body, invalid_format}`; acima do
+teto → `{body, too_long}`, sem ler) → a vaga de envio (um por vez por processo; o segundo espera sem ler) → a
+leitura com o contador (`{body, too_long}` no primeiro pedaço acima do teto; a desconexão do cliente encerra o
+pedido com um 400, sem 500 e sem registro de exceção) → numa thread do pool: o JSON, os campos na ordem do
+esquema, o base64 estrito e o teto do pacote, o conteúdo do pacote com os tetos fixos da api (um só campo
+`archive`), a versão recalculada (`{version, mismatch}`) e a gravação idempotente. Sucesso: 200 com `created`
+(o reenvio devolve o primeiro envio). O nome e o `repo` saem redigidos no envio e na listagem.
+
 As rotas não recebem parâmetros declarados (só o `Request`), para que o FastAPI não valide nada por
 conta própria nem anuncie o 422; o OpenAPI de parâmetros e corpos vem de `operations` (ver `app`).
 O trabalho com o banco roda numa thread do pool (`ApiContext.call`), no núcleo síncrono.
@@ -46,6 +60,9 @@ O trabalho com o banco roda numa thread do pool (`ApiContext.call`), no núcleo 
 
 from __future__ import annotations
 
+import asyncio
+import binascii
+import dataclasses
 import re
 import uuid
 from collections.abc import Callable
@@ -55,10 +72,12 @@ from typing import Any
 import psycopg
 from fastapi import FastAPI, Request
 from starlette.concurrency import run_in_threadpool
+from starlette.requests import ClientDisconnect
 from starlette.responses import JSONResponse, Response
 
 import cq_server
 from cq_server import (
+    banks,
     bots,
     digests,
     dispatches,
@@ -83,6 +102,7 @@ from cq_server.api.validation import INVALID, MAX_CURSOR, RequestChecker
 from cq_server.events import DEFAULT_LIMIT, MAX_LIMIT, EventType
 from cq_server.migrate import EXPECTED_VERSION, current_version
 from cq_server.permissions import Permission
+from cq_server.redaction import redact_operator_text
 from cq_server.reportrender import CsvReportRenderer, JsonReportRenderer
 from cq_server.timezones import TimezoneError, validate_timezone
 
@@ -518,9 +538,11 @@ _OFFSET_TIME = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:
 MAX_OPENS_AHEAD = timedelta(days=dispatches.MAX_OPENS_AHEAD_DAYS)
 # `X-CQ-Client` → a origem declarada padrão.
 _CLIENT_ORIGIN = {"cli": "cli", "mcp": "mcp", "other": "api"}
-# `validate_repo` → o motivo do contrato.
+# `validate_ref_repo` → o motivo do contrato (a forma `bank:` fora do padrão é um formato inválido).
 _REPO_REASONS = {"repo_length": "too_long", "repo_syntax": "invalid_format", "repo_dot_segment": "invalid_format",
-                 "host_not_allowed": "invalid_value"}
+                 "host_not_allowed": "invalid_value", "bank_name": "invalid_format"}
+# A versão de um banco enviado no papel do commit.
+_BANK_COMMIT = re.compile(r"[0-9a-f]{64}")
 
 
 def _offset_time(check: RequestChecker, obj: dict[str, Any], name: str) -> Any:
@@ -547,7 +569,9 @@ def _dispatch_prepare_request(check: RequestChecker, obj: dict[str, Any], *, now
                               allowed_hosts: frozenset[str], client: str) -> dispatches.DispatchRequest | None:
     """`{repo, commit, qid, opens_at?, closes_at?, origin?}`: um
     motivo por campo, na ordem do esquema, sem eco; os horários relativos a `now` (abertura futura e até
-    90 dias; janela de 5 min a 30 dias, e no imediato `closes_at - now` no mesmo intervalo)."""
+    90 dias; janela de 5 min a 30 dias, e no imediato `closes_at - now` no mesmo intervalo). O `repo` pela
+    forma da referência (`https` na lista de hosts, ou `bank:<nome>` sem ela); com `bank:`, o `commit` só com
+    64 hexadecimais. Nenhuma consulta ao banco de dados."""
     ok = True
     repo = check.required_text(obj, "repo")
     if repo is not None:
@@ -555,12 +579,15 @@ def _dispatch_prepare_request(check: RequestChecker, obj: dict[str, Any], *, now
             check.add("repo", "too_short")
             repo = None
         else:
-            problem = questionrefs.validate_repo(repo, allowed_hosts)
+            problem = questionrefs.validate_ref_repo(repo, allowed_hosts)
             if problem is not None:
                 check.add("repo", _REPO_REASONS[problem])
                 repo = None
+    # Numa referência de banco enviado, o commit é a versão do banco (só 64 hexadecimais).
+    commit_form = (_BANK_COMMIT if repo is not None and questionrefs.BANK_REPO.fullmatch(repo) is not None
+                   else questionrefs.COMMIT)
     commit = check.required_text(obj, "commit")
-    if commit is not None and questionrefs.COMMIT.fullmatch(commit) is None:
+    if commit is not None and commit_form.fullmatch(commit) is None:
         check.add("commit", "invalid_format")
         commit = None
     qid = check.required_text(obj, "qid")
@@ -747,6 +774,201 @@ def _digest_request(check: RequestChecker, obj: dict[str, Any]) -> dict[str, Any
     if not obj or enabled is INVALID or local_time is INVALID:
         return None
     return {"enabled": enabled, "local_time": local_time}
+
+
+# --- banco de questões local ---------------------------------------------------------------------
+
+# O `Content-Length` aceito: só dígitos decimais (sem sinal, espaço nem notação científica).
+_CONTENT_LENGTH = re.compile(r"[0-9]+")
+# Mais dígitos que isto já passa de qualquer teto do corpo (e o `int` não precisa ver o texto).
+_MAX_LENGTH_DIGITS = 19
+# A versão do banco (64 hexadecimais minúsculos) e o commit de origem (40 ou 64).
+_BANK_VERSION = re.compile(r"[0-9a-f]{64}")
+_BANK_GIT_COMMIT = re.compile(r"[0-9a-f]{40}|[0-9a-f]{64}")
+# O texto base64 do pacote: o menor (um grupo de 4) e o maior (o base64 do teto do pacote, com preenchimento).
+_MIN_ARCHIVE_TEXT = 4
+_MAX_ARCHIVE_TEXT = 4 * ((banks.MAX_ARCHIVE_BYTES + 2) // 3)
+_BANK_UPLOAD_FIELDS = ("name", "version", "source", "git_commit", "archive")
+
+
+def _is_bank_name(value: str) -> bool:
+    return banks.BANK_NAME.fullmatch(value) is not None
+
+
+def _content_length(check: RequestChecker, request: Request) -> None:
+    """O `Content-Length` do envio, conferido antes de ler o corpo: ausente vale (o contador da leitura
+    confere); repetido ou não numérico → `{body, invalid_format}`; acima do teto do corpo → `{body, too_long}`."""
+    values = request.headers.getlist("content-length")
+    if not values:
+        return
+    if len(values) != 1 or _CONTENT_LENGTH.fullmatch(values[0]) is None:
+        check.add("body", "invalid_format")
+        return
+    digits = values[0].lstrip("0")
+    if len(digits) > _MAX_LENGTH_DIGITS or int(digits or "0") > banks.MAX_BODY_BYTES:
+        check.add("body", "too_long")
+
+
+def _archive_bytes(check: RequestChecker, text: str) -> bytes | None:
+    """O pacote em base64 padrão, estrito: só o alfabeto padrão, com o preenchimento só no fim, em grupos de 4
+    e na forma canônica (os bits que sobram no último grupo zerados); senão `invalid_format`. Acima do teto do
+    pacote (pelo tamanho do texto, antes de decodificar, ou pelo decodificado) → `too_long`."""
+    if len(text) > _MAX_ARCHIVE_TEXT:
+        check.add("archive", "too_long")
+        return None
+    if len(text) < _MIN_ARCHIVE_TEXT:
+        check.add("archive", "invalid_format")
+        return None
+    try:
+        data = binascii.a2b_base64(text, strict_mode=True)
+        # A forma canônica do último grupo (o decodificador aceita bits de sobra não nulos).
+        canonical = binascii.b2a_base64(binascii.a2b_base64(text[-4:], strict_mode=True), newline=False)
+    except (binascii.Error, ValueError):
+        check.add("archive", "invalid_format")
+        return None
+    if canonical.decode("ascii") != text[-4:]:
+        check.add("archive", "invalid_format")
+        return None
+    if len(data) > banks.MAX_ARCHIVE_BYTES:
+        check.add("archive", "too_long")
+        return None
+    return data
+
+
+def _bank_upload_request(check: RequestChecker, obj: dict[str, Any]) -> tuple[str, str, str, str | None,
+                                                                              bytes] | None:
+    """Pedido de `banks.upload`: `{name, version, source, git_commit?, archive}`, fechado, com um motivo por
+    campo na ordem do esquema, sem eco. Um campo ausente é `missing`; presente com o tipo errado (inclusive
+    `null`), `invalid_format` (a origem: `invalid_value`). `git_commit` é obrigatório e não nulo na origem `git`
+    e ausente ou nulo na `folder` (um valor na forma certa é `invalid_value`); com a origem inválida, só a forma
+    dele é conferida."""
+    name: str | None = None
+    if "name" not in obj:
+        check.add("name", "missing")
+    elif not isinstance(obj["name"], str):
+        check.add("name", "invalid_format")
+    elif len(obj["name"]) < 3:
+        check.add("name", "too_short")
+    elif len(obj["name"]) > 40:
+        check.add("name", "too_long")
+    elif not _is_bank_name(obj["name"]):
+        check.add("name", "invalid_format")
+    else:
+        name = obj["name"]
+
+    version: str | None = None
+    if "version" not in obj:
+        check.add("version", "missing")
+    elif not isinstance(obj["version"], str) or _BANK_VERSION.fullmatch(obj["version"]) is None:
+        check.add("version", "invalid_format")
+    else:
+        version = obj["version"]
+
+    source: str | None = None
+    if "source" not in obj:
+        check.add("source", "missing")
+    elif not isinstance(obj["source"], str) or obj["source"] not in banks.SOURCES:
+        check.add("source", "invalid_value")
+    else:
+        source = obj["source"]
+
+    git_commit: Any = obj.get("git_commit")
+    commit_ok = True
+    if git_commit is None:
+        if source == "git":
+            check.add("git_commit", "missing")
+            commit_ok = False
+    elif not isinstance(git_commit, str) or _BANK_GIT_COMMIT.fullmatch(git_commit) is None:
+        check.add("git_commit", "invalid_format")
+        commit_ok = False
+    elif source == "folder":
+        check.add("git_commit", "invalid_value")
+        commit_ok = False
+
+    archive: bytes | None = None
+    if "archive" not in obj:
+        check.add("archive", "missing")
+    elif not isinstance(obj["archive"], str):
+        check.add("archive", "invalid_format")
+    else:
+        archive = _archive_bytes(check, obj["archive"])
+
+    check.body_keys(obj, _BANK_UPLOAD_FIELDS)
+    if name is None or version is None or source is None or not commit_ok or archive is None:
+        return None
+    return name, version, source, git_commit, archive
+
+
+def _bank_version_dto(stored: banks.BankVersion) -> dict[str, Any]:
+    return {"name": stored.name, "version": stored.version, "repo": stored.repo, "source": stored.source,
+            "git_commit": stored.git_commit, "file_count": stored.file_count, "byte_count": stored.byte_count,
+            "question_count": stored.question_count, "created_at": schemas.timestamp(stored.created_at)}
+
+
+def _store_bank(conn: psycopg.Connection, /, *, name: str, version: str, source: str, git_commit: str | None,
+                archive: bytes, summary: banks.ArchiveSummary, now: datetime, actor_token_id: str,
+                secrets: tuple[str, ...]) -> tuple[banks.BankVersion, bool]:
+    """A gravação (idempotente) e a versão guardada com o nome e o `repo` redigidos pelas identidades do momento,
+    numa só transação. O valor gravado fica literal."""
+    with conn.transaction():
+        stored, created = banks.ensure_bank(conn, name=name, version=version, source=source,
+                                            git_commit=git_commit, archive=archive, summary=summary, now=now,
+                                            actor_token_id=actor_token_id)
+        identities = events.load_known_identities(conn)
+    shown = dataclasses.replace(stored, name=redact_operator_text(stored.name, identities, secrets=secrets),
+                                repo=redact_operator_text(stored.repo, identities, secrets=secrets))
+    return shown, created
+
+
+def _bank_upload(ctx: ApiContext, raw: bytearray, *, actor_token_id: str) -> tuple[banks.BankVersion, bool]:
+    """O envio depois da leitura do corpo, numa thread do pool: o JSON e os campos (um 400 com todos), o pacote
+    (com os tetos fixos da api; a recusa é um 400 com um só campo), a versão recalculada e a gravação. Nenhuma
+    recusa leva texto de exceção nem nada do pacote."""
+    check = RequestChecker()
+    obj = check.json_object(raw)  # o `bytearray` lido, sem cópia
+    # O texto cru não serve mais: a memória do corpo volta antes de decodificar o pacote.
+    raw.clear()
+    parsed = _bank_upload_request(check, obj) if obj is not None else None
+    del obj
+    check.raise_if_invalid()
+    assert parsed is not None
+    name, version, source, git_commit, archive = parsed
+
+    refusal: FieldIssue | None = None
+    try:
+        summary = banks.read_archive(archive, max_files=banks.MAX_FILES, max_bytes=banks.MAX_CONTENT_BYTES)
+    except banks.BankArchiveError as exc:
+        refusal = FieldIssue(exc.field, exc.reason)
+    if refusal is not None:
+        raise ApiError("invalid_request", fields=[refusal])
+    if banks.bank_version(summary.entries) != version:
+        raise ApiError("invalid_request", fields=[FieldIssue("version", "mismatch")])
+    return ctx.run(_store_bank, name=name, version=version, source=source, git_commit=git_commit,
+                   archive=archive, summary=summary, now=ctx.clock.now(), actor_token_id=actor_token_id,
+                   secrets=ctx.secrets)
+
+
+async def _read_bank_body(request: Request) -> bytearray:
+    """O corpo do envio em fluxo, com o contador: recusa (`{body, too_long}`) no primeiro pedaço que passa do
+    teto, sem ler o resto. A desconexão do cliente no meio encerra o pedido com um 400 sem registro de exceção
+    (nada foi guardado, e a resposta não chega a ninguém)."""
+    buffer = bytearray()
+    too_long = disconnected = False
+    stream = request.stream()
+    try:
+        async for chunk in stream:
+            if len(buffer) + len(chunk) > banks.MAX_BODY_BYTES:
+                too_long = True
+                break
+            buffer.extend(chunk)
+    except ClientDisconnect:
+        disconnected = True
+    finally:
+        await stream.aclose()
+    if too_long or disconnected:
+        buffer.clear()
+        raise ApiError("invalid_request", fields=[FieldIssue("body", "too_long" if too_long else "invalid_format")])
+    return buffer
 
 
 # --- saúde ---------------------------------------------------------------------------------------
@@ -1612,3 +1834,46 @@ def register_routes(app: FastAPI, ctx: ApiContext) -> None:
         _rule_error(result)
         assert isinstance(result, digests.DigestView)
         return _digest_dto(result)
+
+    # --- banco de questões local ------------------------------------------------------------------
+
+    # Um envio por vez por processo: o segundo espera a vaga sem ler o corpo; a vaga só é solta depois da
+    # gravação (ou da recusa).
+    app.state.bank_upload_slot = asyncio.Semaphore(1)
+
+    @route("banks.upload", response_model=schemas.BankUploadResult)
+    async def upload_bank(request: Request) -> schemas.BankUploadResult:
+        # A única rota com a permissão antes da forma do corpo: o corpo custa até centenas de MB.
+        principal = principal_of(request.scope)
+        check = RequestChecker()
+        check.client_kind(request.headers)
+        check.query_keys(request.query_params, ())
+        check.raise_if_invalid()
+        _require(principal, Permission.OFFERINGS_WRITE)
+        _content_length(check, request)
+        check.raise_if_invalid()
+
+        async with app.state.bank_upload_slot:
+            raw = await _read_bank_body(request)
+            stored, created = await run_in_threadpool(_bank_upload, ctx, raw, actor_token_id=principal.actor)
+        return schemas.BankUploadResult(**_bank_version_dto(stored), created=created)
+
+    @route("banks.list", response_model=schemas.BanksPage)
+    async def list_banks(request: Request) -> schemas.BanksPage:
+        principal = principal_of(request.scope)
+        check = RequestChecker()
+        check.client_kind(request.headers)
+        params = request.query_params
+        check.query_keys(params, ("after", "limit", "name"))
+        after = check.query_int(params, "after", default=0, minimum=0, maximum=MAX_CURSOR)
+        limit = check.query_int(params, "limit", default=DEFAULT_LIMIT, minimum=1, maximum=MAX_LIMIT)
+        name = check.query_pattern(params, "name", _is_bank_name)
+        check.reject_body(await request.body())
+        check.raise_if_invalid()
+        assert after is not None and limit is not None
+        _require(principal, Permission.OFFERINGS_READ)
+
+        page = await ctx.call(_with_identities(banks.list_banks), name=name, after=after, limit=limit,
+                              secrets=ctx.secrets)
+        return schemas.BanksPage(items=[schemas.BankVersion(**_bank_version_dto(item)) for item in page.items],
+                                 next_cursor=page.next_cursor)

@@ -97,7 +97,7 @@ Um valor inválido nas três variáveis do `cq doctor` é uso incorreto (código
 | --- | --- |
 | 0 | sucesso |
 | 1 | a API recusou o pedido (resposta 4xx ou 5xx); o `cq health` achou a API com problema; o `cq status` ou o `cq doctor` acharam um problema; uma falha do Docker nos comandos locais; a pilha que não fica saudável no tempo do `cq up` ou publica outra porta que a do perfil |
-| 2 | uso incorreto: opção, argumento ou perfil inválido; em `cq up`, `cq down` e `cq logs`, também o perfil remoto e o `.env` ausente no diretório da pilha; neles e no `cq status`, o diretório da pilha não encontrado, uma variável obrigatória ausente no `.env` e o Docker apontando para um alvo que não é local (`DOCKER_HOST` ou `DOCKER_CONTEXT`) |
+| 2 | uso incorreto: opção, argumento ou perfil inválido; em `cq banks upload`, a recusa local da pasta ou do git, antes de qualquer pedido à API; em `cq up`, `cq down` e `cq logs`, também o perfil remoto e o `.env` ausente no diretório da pilha; neles e no `cq status`, o diretório da pilha não encontrado, uma variável obrigatória ausente no `.env` e o Docker apontando para um alvo que não é local (`DOCKER_HOST` ou `DOCKER_CONTEXT`) |
 | 3 | a API está inalcançável |
 | 130 | interrompido com Ctrl+C: em `cq up`, `cq down`, `cq status` e `cq logs`, no `cq doctor`, nas duas fases do expurgo e na pergunta para subir a pilha local quando a API está inalcançável (inclusive durante a subida); nos demais comandos, o Ctrl+C sai com 1, e no `cq mcp`, com 0 |
 
@@ -188,7 +188,7 @@ As permissões são: `people:read`, `people:write`, `events:read`, `identity:rev
 
 | Comando | Operação | O que faz |
 | --- | --- | --- |
-| `cq dispatches prepare REF --repo URL --commit SHA --qid QID` | `dispatches.prepare` | Prepara o disparo de uma questão: `--repo` é a URL `https` do repositório da questão, `--commit` o SHA do commit (40 ou 64 dígitos hexadecimais) e `--qid` o caminho da questão no repositório. `--opens-at` e `--closes-at` (ISO 8601 com deslocamento, ex.: `2031-01-02T09:00:00-03:00`) definem a janela; sem a abertura, ela é imediata; sem o fechamento, vale a janela do oferecimento. A validação da questão roda depois, no worker (o serviço de segundo plano da pilha). |
+| `cq dispatches prepare REF --repo URL --commit SHA --qid QID` | `dispatches.prepare` | Prepara o disparo de uma questão: `--repo` é a URL `https` do repositório da questão, `--commit` o SHA do commit (40 ou 64 dígitos hexadecimais) e `--qid` o caminho da questão no repositório. Para uma questão de um banco enviado por `cq banks upload`, `--repo` é a referência `bank:<nome>` e `--commit` é a versão do banco (64 dígitos hexadecimais). `--opens-at` e `--closes-at` (ISO 8601 com deslocamento, ex.: `2031-01-02T09:00:00-03:00`) definem a janela; sem a abertura, ela é imediata; sem o fechamento, vale a janela do oferecimento. A validação da questão roda depois, no worker (o serviço de segundo plano da pilha). |
 | `cq dispatches show REF DISPATCH_ID` | `dispatches.get` | Mostra um disparo, com a prévia da questão depois da validação ou o motivo da rejeição. |
 | `cq dispatches list REF` | `dispatches.list` | Lista os disparos do oferecimento em ordem de preparo; aceita `--after` e `--limit`. |
 | `cq dispatches confirm REF DISPATCH_ID` | `dispatches.confirm` | Confirma um disparo validado: a questão vai à turma no horário de abertura. |
@@ -196,6 +196,39 @@ As permissões são: `people:read`, `people:write`, `events:read`, `identity:rev
 | `cq messages list REF` | `messages.list` | Lista as mensagens livres dos alunos, com o texto redigido; aceita `--after` e `--limit`. |
 
 A [página dos tipos de questão](tipos-de-questao.md) diz quais questões passam pela validação.
+
+### Bancos de questões
+
+Um banco de questões local é uma pasta de curso do PrairieLearn (com o `infoCourse.json` na raiz) que o `cq` envia à
+API, para disparar as questões dela sem um repositório `https`. O guia
+[Banco de questões local](../operacao/banco-local.md) trata do uso.
+
+| Comando | Operação | O que faz |
+| --- | --- | --- |
+| `cq banks upload PASTA --name NOME` | `banks.upload` | Lê a pasta, confere as regras, calcula a versão (o SHA-256 do conteúdo), empacota e envia. `--name` é o nome do banco (letras minúsculas, dígitos e hífen, de 3 a 40, começando por letra ou dígito). Sem `--git`, envia a pasta como está; com `--git REVISÃO` (um ramo, uma etiqueta ou um hash), envia a árvore dessa pasta no commit da revisão, lida do repositório git local que a contém (o `git` precisa estar no `PATH`). A saída diz o nome, a versão, se ela é nova ou já existia, a origem (e o commit, com `--git`), as contagens de arquivos, bytes e questões, e a linha pronta do preparo do disparo. |
+| `cq banks list` | `banks.list` | Lista os bancos enviados, uma linha por versão, em ordem do primeiro envio: o nome, a versão, a referência `bank:<nome>`, a origem, o commit git (ou `-`), as contagens e o horário. `--name NOME` filtra pelo nome exato; aceita `--after` e `--limit`. |
+
+A linha pronta que o `cq banks upload` imprime tem esta forma, com o nome e a versão do envio:
+
+```bash
+cq dispatches prepare <oferecimento> --repo bank:meu-curso --commit <versão> --qid <qid>
+```
+
+Regras da leitura, conferidas antes de qualquer pedido à API:
+
+- só arquivos comuns: um link simbólico, uma junção ou outro ponto de reanálise do Windows, um arquivo especial e,
+  com `--git`, um submódulo são recusados, também na raiz; a pasta `.git` fica de fora, em qualquer nível e caixa, e
+  as pastas vazias não entram no banco;
+- até 20000 arquivos e 100 MiB de conteúdo; o pacote montado, até 128 MiB;
+- um caminho de rede (UNC) ou de dispositivo não é aceito como pasta;
+- com `--git`, a revisão aceita só letras, dígitos e os sinais `_ . / @ { } ~ ^ -`, sem começar por hífen, até 256
+  caracteres.
+
+Uma recusa local sai com o código 2 e uma mensagem fixa do motivo; quando o motivo é um arquivo, a linha seguinte
+mostra o caminho dele dentro do banco, com os caracteres de controle neutralizados. O caminho local da pasta nunca
+vai à API. Uma recusa da API (como a versão que não confere) sai com o código 1, como nos outros comandos. O envio tem
+um prazo de 300 segundos para a resposta, em vez dos 30 dos outros comandos. Reenviar o mesmo nome com a mesma versão
+não grava nada de novo: a saída diz "já existia" e mostra o primeiro envio.
 
 ### Relatórios
 
