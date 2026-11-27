@@ -60,9 +60,11 @@ sem `bots`), com a própria conexão (`application_name = cq-worker/invites`, ab
 `close()` no `ExitStack`; os tratadores do chamador têm precedência.
 
 **Entrega e correção das questões:**
-`run_worker(…, engine=None, fetcher=None, delivery=None, console_routes=False)`: o motor
-(`ports.engine`), a obtenção (`ports.repos`), a configuração de entrega (`None` = `DeliverySettings()`)
-e o modo de console com rota (a entrada simulada do aluno).
+`run_worker(…, engine=None, fetcher=None, delivery=None, console_routes=False, bank_fetcher=None)`: o motor
+(`ports.engine`), a obtenção (`ports.repos`), a configuração de entrega (`None` = `DeliverySettings()`),
+o modo de console com rota (a entrada simulada do aluno) e a publicação dos bancos enviados (com ela, os
+tratadores recebem o roteador `banks.RoutingRepoFetcher`, que manda as referências `bank:` ao banco e as
+demais ao `fetcher`; sem ela, o `fetcher` vai intacto).
 - sem `bots` e sem `console_routes`: exatamente o caminho dos convites (só o `invite.email`, nenhum tratador
   das questões e nenhuma varredura);
 - com `bots` ou com `console_routes=True`: os tratadores das 8 tarefas das questões (`dispatch.validate`,
@@ -107,6 +109,7 @@ from psycopg.conninfo import make_conninfo
 from cq_server import db, deliveries, digests, dispatches, grading, previews, reception, reports, students, teamnotices
 from cq_server._leasing import MAX_WAIT_SECONDS, LazyConnection
 from cq_server.adapters.console import ConsoleChannel
+from cq_server.banks import RoutingRepoFetcher
 from cq_server.bots import (
     BotRuntime,
     TelegramChannel,
@@ -1066,12 +1069,19 @@ def run_worker(settings: Settings, *, stop: threading.Event, clock: Clock | None
                fetcher: RepoFetcher | None = None,
                delivery: DeliverySettings | None = None,
                console_routes: bool = False,
-               mail_probe: MailProbeLoop | None = None) -> None:
+               mail_probe: MailProbeLoop | None = None,
+               bank_fetcher: RepoFetcher | None = None) -> None:
     """Processa tarefas e mensagens até o `stop` (ver o docstring do módulo).
 
     `mail_probe` é o laço do teste do servidor de e-mail; sem ele (`None`), nenhuma sonda roda. Com
-    ele, a thread `cq-mail-probe` sobe depois da espera do esquema, nos três caminhos."""
+    ele, a thread `cq-mail-probe` sobe depois da espera do esquema, nos três caminhos.
+
+    `bank_fetcher` é a publicação dos bancos de questões enviados (as referências `bank:`). Só com ele os
+    tratadores recebem o roteador da obtenção (`banks.RoutingRepoFetcher`), com o `fetcher` no lado do git e o
+    `bank_fetcher` no do banco; sem ele, recebem o `fetcher` intacto, o mesmo objeto (ou `None`)."""
     clock = clock if clock is not None else SystemClock()
+    if bank_fetcher is not None:
+        fetcher = RoutingRepoFetcher(git=fetcher, bank=bank_fetcher)
     delivery = delivery if delivery is not None else DeliverySettings()
     caller_handlers = dict(handlers) if handlers is not None else {}
     worker_id = settings.worker_id or default_worker_id()

@@ -7,17 +7,25 @@
 - `ComposeStack`: o `Stack` real, que só monta os argv de uma lista fechada sobre o prefixo
   `docker compose -p <projeto> -f <dir>/compose.yaml --env-file <dir>/.env` e classifica as falhas
   (`stack.classify_failure`), nunca repassando o texto do Docker.
+- `GitRunner`: o executor do `git` da leitura de um banco de questões num git local
+  (`cq_client.banks.read_git`), sem shell, com `argv = [<git absoluto>, "-C", <pasta>, ...]`. O `git` é
+  achado só nas entradas absolutas do `PATH` (nunca no diretório atual, nem pelo `shutil.which`; no Windows, só
+  `git.exe`) e nunca dentro da pasta do banco; o processo roda no diretório do próprio executável, com o
+  ambiente sem nenhuma `GIT_*` mais `GIT_NO_LAZY_FETCH=1`, `GIT_NO_REPLACE_OBJECTS=1` e `GIT_TERMINAL_PROMPT=0`,
+  e `-c core.fsmonitor=false -c core.hooksPath=` em toda chamada (a configuração do operador não roda programa).
+  Sem o `git`, `GitUnavailable`, que fica fora da hierarquia `StackError`.
 
 É o único módulo do cliente que importa `subprocess`.
 """
 
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
 import threading
 from collections.abc import Iterator, Mapping, Sequence
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 
 from cq_client.stack import (
     LOG_SERVICES,
@@ -46,6 +54,106 @@ OPERATION_TIMEOUT: float | None = None
 
 # Espera pelo término do subprocesso de `stream` depois do `terminate` (antes do `kill`).
 _TERMINATE_GRACE = 5.0
+
+
+# --------------------------------------------------------------------------------------------------
+# O executor do git (banco de questões local)
+# --------------------------------------------------------------------------------------------------
+
+
+class GitUnavailable(Exception):
+    """O `git` não foi achado numa entrada absoluta do `PATH` fora da pasta do banco. Sem caminho na mensagem."""
+
+    def __init__(self) -> None:
+        super().__init__("git indisponível")
+
+
+# O nome do executável procurado em cada entrada do `PATH` (no Windows, só o `.exe`: sem o `PATHEXT`, um
+# `git.bat` ou `git.cmd` nunca é escolhido).
+_GIT_NAME = "git.exe" if os.name == "nt" else "git"
+# O ambiente que o executor acrescenta: sem busca de objetos na rede (clone parcial), sem objetos de
+# substituição (`refs/replace`) e sem pedido de credencial no terminal.
+GIT_ENV: Mapping[str, str] = {"GIT_NO_LAZY_FETCH": "1", "GIT_NO_REPLACE_OBJECTS": "1", "GIT_TERMINAL_PROMPT": "0"}
+# As opções de configuração de toda chamada: a configuração do operador não roda programa (o monitor do
+# sistema de arquivos e os ganchos ficam desligados).
+GIT_CONFIG_OPTIONS: tuple[str, ...] = ("-c", "core.fsmonitor=false", "-c", "core.hooksPath=")
+
+
+def _norm_path(path: str) -> str:
+    return os.path.normcase(os.path.realpath(path))
+
+
+def _inside(path: str, folder: str) -> bool:
+    """`path` fica em `folder` ou abaixo dela (os dois já normalizados); unidades diferentes: fora."""
+    try:
+        return os.path.commonpath([path, folder]) == folder
+    except ValueError:
+        return False
+
+
+def _absolute_entry(entry: str) -> bool:
+    """Uma entrada do `PATH` absoluta de verdade: no Windows, com unidade e raiz (ou UNC); nunca relativa ao
+    diretório atual nem à unidade atual."""
+    if os.name == "nt":
+        return PureWindowsPath(entry).is_absolute()
+    return os.path.isabs(entry)
+
+
+def find_git(bank: str, path_value: str | None = None) -> str:
+    """O `git` da primeira entrada absoluta do `PATH` que o tem, fora da pasta do banco (nunca o diretório atual
+    nem uma entrada relativa); `GitUnavailable` sem ele. Sem `shutil.which`, que no Windows olha o diretório atual
+    antes do `PATH` e aceita os `.bat` e `.cmd` do `PATHEXT`."""
+    value = os.environ.get("PATH", "") if path_value is None else path_value
+    folder = _norm_path(bank)
+    for raw in value.split(os.pathsep):
+        # **[I]** As aspas em volta de uma entrada (comuns no `PATH` do Windows) não fazem parte do caminho.
+        entry = raw.strip().strip('"') if os.name == "nt" else raw
+        if not entry or not _absolute_entry(entry):
+            continue
+        candidate = os.path.join(entry, _GIT_NAME)
+        try:
+            usable = os.path.isfile(candidate) and (os.name == "nt" or os.access(candidate, os.X_OK))
+        except (OSError, ValueError):
+            usable = False
+        if not usable:
+            continue
+        if _inside(_norm_path(entry), folder) or _inside(_norm_path(candidate), folder):
+            continue
+        return candidate
+    raise GitUnavailable()
+
+
+def git_env(environ: Mapping[str, str]) -> dict[str, str]:
+    """O ambiente do `git`: o do processo sem nenhuma `GIT_*` (em qualquer caixa), mais o `GIT_ENV`."""
+    env = {key: value for key, value in environ.items() if not key.upper().startswith("GIT_")}
+    env.update(GIT_ENV)
+    return env
+
+
+class GitRunner:
+    """O executor real do `git` para a leitura de um banco num git local (ver o docstring do módulo)."""
+
+    def run(self, args: Sequence[str], *, repo: str, input: bytes | None,
+            timeout: float | None) -> RunResult:
+        """Roda `git -C <repo> -c core.fsmonitor=false -c core.hooksPath= <args>`, sem shell, no diretório do
+        executável, com a entrada em bytes e o prazo dados. Sem o `git` (ou se ele não roda), `GitUnavailable`; o
+        prazo esgotado propaga o `subprocess.TimeoutExpired` (quem chama o trata sem repassar o texto)."""
+        executable = find_git(repo)
+        argv = [executable, "-C", repo, *GIT_CONFIG_OPTIONS, *args]
+        env = git_env(os.environ)
+        workdir = os.path.dirname(executable)
+        streams: dict[str, object] = ({"input": input} if input is not None else {"stdin": subprocess.DEVNULL})
+        completed: subprocess.CompletedProcess[bytes] | None
+        try:
+            completed = subprocess.run(argv, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env,
+                                       cwd=workdir, timeout=timeout, check=False, shell=False,
+                                       **streams)  # type: ignore[call-overload]
+        except OSError:
+            completed = None
+        if completed is None:
+            # O executável sumiu ou não roda: o mesmo que fora do `PATH`, sem o texto do sistema.
+            raise GitUnavailable()
+        return RunResult(completed.returncode, completed.stdout or b"", completed.stderr or b"")
 
 
 # --------------------------------------------------------------------------------------------------

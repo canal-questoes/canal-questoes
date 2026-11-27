@@ -143,7 +143,8 @@ def _db_state(sql: Any) -> dict:
 
     Oferecimentos e bots: também a linha inteira das tabelas e filas (`OFFERING_BOT_STATE_TABLES`). Vínculo do aluno: e da tabela
     `invite_sends` (`STUDENT_LINK_STATE_TABLES`). Disparo e resposta: e das tabelas com `id` (`DISPATCH_STATE_TABLES`). Relatórios: e
-    das tabelas com `id` (`REPORT_STATE_TABLES`)."""
+    das tabelas com `id` (`REPORT_STATE_TABLES`). Banco de questões local: e de `question_banks`, lida como `id`, nome,
+    versão e o SHA-256 do pacote (não a linha inteira: o JSON da linha traria o pacote em hexadecimal)."""
     return {
         "people": sql.execute("SELECT pseudo_id::text FROM people ORDER BY id").fetchall(),
         "identities": sql.execute("SELECT count(*) FROM identities").fetchone()[0],
@@ -152,6 +153,9 @@ def _db_state(sql: Any) -> dict:
         "events": sql.execute("SELECT seq, type FROM events ORDER BY seq").fetchall(),
         **{table: sql.execute(f"SELECT row_to_json(t)::text FROM {table} t ORDER BY id").fetchall()
            for table in OFFERING_BOT_STATE_TABLES + STUDENT_LINK_STATE_TABLES + DISPATCH_STATE_TABLES + REPORT_STATE_TABLES},
+        # Banco de questões local
+        "question_banks": sql.execute(
+            "SELECT id, name, version, encode(sha256(archive), 'hex') FROM question_banks ORDER BY id").fetchall(),
     }
 
 

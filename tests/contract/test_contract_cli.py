@@ -330,7 +330,7 @@ def test_doctor_purge_operations_in_catalog_registry_and_openapi() -> None:
     by_id = {op["id"]: op for op in operations}
     assert {op_id: {k: v for k, v in by_id[op_id].items() if k != "id"} for op_id in DOCTOR_PURGE_OPERATIONS} == \
         CATALOG_ENTRIES
-    assert [op["id"] for op in operations][-3:] == list(DOCTOR_PURGE_OPERATIONS)
+    assert [op["id"] for op in operations][36:39] == list(DOCTOR_PURGE_OPERATIONS)
     assert by_id["system.health"] == SYSTEM_HEALTH_ENTRY
     assert {op_id for op_id in DOCTOR_PURGE_OPERATIONS if by_id[op_id]["mcp"].get("confirm")} == {"offerings.purge"}
     assert _body(_load("offerings.purge.request.schema.json")) == _body(_load("offerings.archive.request.schema.json"))

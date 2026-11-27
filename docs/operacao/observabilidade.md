@@ -180,7 +180,7 @@ O estado final de cada aviso fica no log de eventos, no tipo `notice.recorded`.
 ## 6. O log de eventos
 
 O banco guarda um log de eventos de auditoria, em ordem de sequência. Cada mudança relevante grava o seu evento na
-mesma transação da mudança, e há 48 tipos:
+mesma transação da mudança, e há 49 tipos:
 
 | Assunto | Tipos |
 | --- | --- |
@@ -193,6 +193,7 @@ mesma transação da mudança, e há 48 tipos:
 | Disparos | `dispatch.prepared`, `dispatch.validated`, `dispatch.rejected`, `dispatch.confirmed`, `dispatch.cancelled`, `dispatch.opened`, `dispatch.closed` |
 | Entregas, respostas e relatórios | `delivery.delivered`, `delivery.not_delivered`, `delivery.question_failed`, `delivery.dont_know`, `submission.graded`, `submission.internal_failure`, `report.frozen` |
 | Falhas e avisos | `task.failed`, `outbox.failed`, `outbox.reply_failed`, `endpoint.blocked`, `notice.recorded` |
+| Bancos de questões | `bank.uploaded` |
 
 Cada evento tem `seq` (a ordem), `type`, `occurred_at` (em UTC), `actor_token_id` (o token que agiu, quando houve um)
 e `data`, com os campos fechados do tipo. Nenhum evento traz identidade: as pessoas aparecem pelo pseudônimo e pelo

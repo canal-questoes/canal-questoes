@@ -1,7 +1,7 @@
 """Servidor MCP do canal-questoes: ferramentas para agentes sobre o catálogo e os comandos locais da
 pilha.
 
-Mais uma fachada do pacote cliente, ao lado do CLI (o catálogo único: endpoint, CLI e MCP): as 31 operações do catálogo
+Mais uma fachada do pacote cliente, ao lado do CLI (o catálogo único: endpoint, CLI e MCP): as 33 operações do catálogo
 com `mcp.exposed: true` viram ferramentas que chamam o `ApiClient` (cabeçalho `X-CQ-Client: mcp`), e os 4
 comandos locais viram 5 ferramentas (`LOCAL_TOOL_BINDINGS`). O processo é o `cq mcp` (stdio), com o
 `Server` de baixo nível do SDK `mcp` nas duas eras do protocolo.
@@ -9,8 +9,9 @@ comandos locais viram 5 ferramentas (`LOCAL_TOOL_BINDINGS`). O processo é o `cq
 Conteúdo: os tipos, as constantes, as tabelas, as mensagens e os construtores (`ServerDeps`,
 `DownCodeStore`, `ImportFileError`); `load_tools` e `build_server`; o caminho
 comum do `tools/call`, com `execution_error`, `api_error_text` e `unreachable_text`; `read_import_file` e a
-`import_students`; as outras 21 do catálogo; as 8 das duas fases; a `reveal_identities`; o despacho
-(`CATALOG_HANDLERS`, `LOCAL_HANDLERS`); o registro de códigos do `down`; as 5 ferramentas locais.
+`import_students`; as outras 21 do catálogo; as 8 das duas fases; a `reveal_identities`; as 2 do banco de
+questões local; o despacho (`CATALOG_HANDLERS`, `LOCAL_HANDLERS`); o registro de códigos do `down`; as 5 ferramentas
+locais.
 O processo `cq mcp` (`serve`) e o silêncio das bibliotecas (`quiet_libraries`) também ficam aqui.
 
 Importa `mcp`, `jsonschema` e os módulos sem Click do cliente; **nunca** `cq_client.cli`, `click`, `cq_server` ou
@@ -50,9 +51,10 @@ from mcp.server.stdio import stdio_server
 from mcp.shared.exceptions import MCPError
 
 import cq_client
-from cq_client import hint, local_commands, local_ops, log_redaction, roster  # noqa: F401 - usados na implementação
+from cq_client import banks, hint, local_commands, local_ops, log_redaction, roster  # noqa: F401 - usados na implementação
 from cq_client.api import UNEXPECTED_RESPONSE_CODE, ApiClient, ApiError, ApiUnreachable
 from cq_client.local_commands import PORT_MISMATCH_MESSAGE, PortMismatch, UpTimeout
+from cq_client.stack_compose import GitRunner
 from cq_client.profile import (
     EffectiveProfile,
     InvalidApiUrl,
@@ -116,6 +118,7 @@ TOOL_NAMES: tuple[str, ...] = (
     "prepare_dispatch", "get_dispatch", "list_dispatches", "confirm_dispatch", "cancel_dispatch",
     "update_offering_settings", "get_dispatch_report", "list_report_versions", "resend_report_summary",
     "get_offering_digest", "update_offering_digest", "run_doctor", "prepare_purge_offering", "purge_offering",
+    "upload_question_bank", "list_question_banks",
     "stack_status", "stack_up", "prepare_stack_down", "stack_down", "stack_logs",
 )
 
@@ -127,10 +130,10 @@ DESTRUCTIVE_TOOLS = frozenset({"archive_offering", "send_invites", "confirm_disp
 READ_ONLY_TOOLS = frozenset({"list_people", "get_person", "list_events", "list_offerings", "get_offering",
                              "get_bot", "get_students_summary", "get_dispatch", "list_dispatches",
                              "get_dispatch_report", "list_report_versions", "get_offering_digest", "run_doctor",
-                             "stack_status", "stack_logs"})
+                             "list_question_banks", "stack_status", "stack_logs"})
 OPEN_WORLD_TOOLS = frozenset({"activate_bot", "send_invites", "resend_invites", "confirm_dispatch",
                               "resend_report_summary"})
-IDEMPOTENT_TOOLS = frozenset({"stack_up"})
+IDEMPOTENT_TOOLS = frozenset({"upload_question_bank", "stack_up"})
 
 # --------------------------------------------------------------------------------------------------
 # Textos fixos
@@ -222,6 +225,7 @@ MCP_MESSAGES: Mapping[str, str] = {
     "stack.StackVariableMissing.unnamed": VARIABLE_MISSING_UNNAMED,
     "stack.UpTimeout": UP_TIMEOUT_TOOL_TEMPLATE,  # com `{seconds}` e `{services}`
     "file.roster": "{reason}",  # a `reason` da leitura da lista, literal
+    "bank.read": "{reason}",  # a mensagem fixa do motivo local da leitura do banco, sem o caminho
     "stack_busy": "Outra operação da pilha está em andamento. Tente de novo quando ela terminar.",
     "down_code_invalid": ("Código de confirmação inválido, vencido ou já usado. Prepare de novo com "
                           "prepare_stack_down."),
@@ -493,7 +497,7 @@ def _source_of(entry: Mapping[str, Any]) -> CatalogSource | LocalSource:
 
 
 def load_tools() -> tuple[ToolSpec, ...]:
-    """As 36 ferramentas, na ordem de `tools.json`, lidas de `MCP_CONTRACT_PACKAGE` por `importlib.resources`.
+    """As 38 ferramentas, na ordem de `tools.json`, lidas de `MCP_CONTRACT_PACKAGE` por `importlib.resources`.
 
     Confere a tabela na carga e falha com `ToolTableError` se ela
     divergir de `TOOL_NAMES`, de `LOCAL_TOOL_BINDINGS` ou dos conjuntos de ferramentas."""
@@ -590,7 +594,9 @@ _ENVELOPE_PERMISSIONS = frozenset({"bots:manage", "events:read", "identity:revea
                                    "offerings:write", "people:read", "people:write", "tokens:manage"})
 _ENVELOPE_FIELD_RE = re.compile(r"(body|query|X-CQ-Client|[a-z_]+(\[[0-9]+\])?)")
 _ENVELOPE_REASONS = frozenset({"missing", "unknown_field", "invalid_format", "too_short", "too_long", "too_few",
-                               "too_many", "out_of_range", "invalid_value", "duplicate"})
+                               "too_many", "out_of_range", "invalid_value", "duplicate",
+                               # Banco de questões local
+                               "too_large", "path_not_allowed", "entry_not_allowed", "not_a_course", "mismatch"})
 _PENDING_KEYS = ("outbox", "updates", "tasks", "freeze", "due")
 
 
@@ -1013,6 +1019,72 @@ def _reveal_identities(call: CatalogCall) -> Any:
 
 
 CATALOG_HANDLERS["reveal_identities"] = _reveal_identities
+
+
+# As 2 ferramentas do banco de questões local.
+
+
+def _bank_path_shape(path: str) -> None:
+    """A forma do caminho da pasta, só pelo texto e antes de qualquer acesso ao disco, na mesma ordem da leitura do
+    arquivo da lista: o caminho absoluto primeiro; depois, no Windows, o de rede (UNC) e o de dispositivo (duas
+    barras no início), que o `stat` abriria como conexão SMB. A leitura do `cq_client.banks` repete as duas
+    checagens; esta garante a recusa antes do `stat` também na leitura pelo git."""
+    if not Path(path).is_absolute():
+        raise banks.BankReadError("not_absolute")
+    if os.name == "nt" and PureWindowsPath(path).drive[:2] in ("\\\\", "//"):
+        raise banks.BankReadError("unc_path")
+
+
+def _read_bank(path: str, revision: str | None) -> tuple[banks.LocalBank, str, bytes]:
+    """A mesma leitura do `cq`: a pasta como está (sem `revision`) ou o commit da revisão no git local, pelo
+    executor real do `git`; a versão pelo conteúdo e o pacote reprodutível. `BankReadError` na primeira recusa."""
+    _bank_path_shape(path)
+    if revision is None:
+        bank = banks.read_folder(path)
+    else:
+        bank = banks.read_git(path, revision, GitRunner())
+    return bank, banks.bank_version(bank.entries), banks.build_archive(bank.entries)
+
+
+def _upload_question_bank(call: CatalogCall) -> Any:
+    """`upload_question_bank`: a pasta (ou, com `git_rev`, o commit do git local) lida, conferida e empacotada pelo
+    `cq_client.banks` **antes** do pedido; uma recusa local sai pela chave `bank.read`, só com a mensagem fixa do
+    motivo, sem o caminho; o resultado é a resposta da API, sem o caminho.
+
+    O caminho relativo do arquivo recusado (`BankReadError.relative_path`) nunca sai: nem no texto, nem na exceção
+    encadeada (a falha é levantada fora do `except`). O envio é o mesmo do `cq`: um único pedido com o nome, a
+    versão, a origem (`git` só com a revisão), o commit e o pacote."""
+    revision = call.arguments.get("git_rev")
+    reason: str | None = None
+    read: tuple[banks.LocalBank, str, bytes] | None = None
+    try:
+        read = _read_bank(call.arguments["path"], revision)
+    except banks.BankReadError as exc:
+        reason = exc.reason
+    if reason is not None:
+        if reason not in banks.LOCAL_MESSAGES:
+            # Um motivo fora do conjunto fechado é defeito interno: cai no erro interno de texto fixo.
+            raise RuntimeError("motivo local desconhecido")
+        raise _local_failure("bank.read", reason=banks.LOCAL_MESSAGES[reason])
+    assert read is not None
+    bank, version, archive = read
+    return call.api.upload_bank(name=call.arguments["name"], version=version,
+                                source="folder" if revision is None else "git", git_commit=bank.git_commit,
+                                archive=archive)
+
+
+def _list_question_banks(call: CatalogCall) -> Any:
+    """`list_question_banks`: uma chamada a `ApiClient.list_banks` com os argumentos validados, mapeados um a um
+    como nas outras listagens: um argumento ausente vai como `None` e fica fora da consulta (sem cursor, a API
+    começa do início)."""
+    return call.api.list_banks(name=call.arguments.get("name"), after=call.arguments.get("after"),
+                               limit=call.arguments.get("limit"))
+
+
+CATALOG_HANDLERS.update({
+    "upload_question_bank": _upload_question_bank,
+    "list_question_banks": _list_question_banks,
+})
 
 
 # --------------------------------------------------------------------------------------------------

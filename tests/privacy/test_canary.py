@@ -902,6 +902,35 @@ assert [expected for key, expected in EXPECTED_CANARY.items() if key[0] in DOCTO
         and expected != _INVALID_CONFIRMATION and not (isinstance(expected, tuple) and expected[0] in (400, 401))
         ] == [], "toda outra chamada canário do CLI é recusada pela forma (400) ou pela autenticação (401)"
 
+# Banco de questões local: as 2 operações e as 2 folhas novas. As chamadas canário (`tests/helpers/calls.py`) põem o
+# nome canário no `name` do corpo do envio (fora do padrão do nome) e como chave do corpo, e no filtro `name` e no
+# cursor `after` da listagem; todas são recusadas antes de guardar qualquer coisa, sem eco e nunca com 409.
+BANK_OPERATIONS = ("banks.upload", "banks.list")
+BANK_EVENT_TYPES = ("bank.uploaded",)
+BANK_CLI_LEAVES = frozenset({"banks upload", "banks list"})
+EXPECTED_CANARY.update({
+    ("banks.upload", "body_value"): (400, "invalid_request", [("name", "invalid_format")]),
+    ("banks.upload", "body_key"): (400, "invalid_request", _UNKNOWN_BODY),
+    ("banks.list", "query_value"): (400, "invalid_request", [("name", "invalid_format")]),
+    ("banks.list", "query_value_after"): (400, "invalid_request", [("after", "invalid_format")]),
+})
+for _op in BANK_OPERATIONS:
+    EXPECTED_CANARY.update({
+        (_op, "header_auth"): _UNAUTHENTICATED,
+        (_op, "header_client"): (400, "invalid_request", _BAD_CLIENT),
+        (_op, "query_key"): (400, "invalid_request", _UNKNOWN_QUERY),
+    })
+# O piso pelo OpenAPI: corpo no envio, consulta na listagem; nenhum parâmetro de caminho. O cursor (`after`) entra pela
+# igualdade das chamadas executadas com `EXPECTED_CANARY` (`_api_phase`), como a consulta `person` de `events.list`.
+MIN_REQUIRED_SURFACES.update({
+    "banks.upload": _BASE_SURFACES | {"body_value", "body_key"},
+    "banks.list": _BASE_SURFACES | {"query_value"},
+})
+assert {key[0] for key in EXPECTED_CANARY if key[0] in BANK_OPERATIONS} == set(BANK_OPERATIONS)
+assert [expected for key, expected in EXPECTED_CANARY.items() if key[0] in BANK_OPERATIONS
+        and not (isinstance(expected, tuple) and expected[0] in (400, 401))] == [], (
+    "toda chamada canário dos bancos é recusada pela forma (400) ou pela autenticação (401)")
+
 # CLI e expurgo: esta fase roda num banco próprio (`db_factory`), com app, cliente, oferecimentos, bots
 # e equipe próprios (a semente `seed_purge_scenario`, com as pessoas canário do expurgo, `PURGE_PREFIXES`).
 # Por escolha deste teste: fora do banco do canário e depois do bloco de captura das fases anteriores,
@@ -5644,6 +5673,40 @@ def _cli_canary_db_runs(cli_invoke: Any, seed: _Seed, clock: Any, sql: psycopg.C
     return runs
 
 
+BANK_CLI_NAME = "banco-cli-sonda"  # neutro: fora dos alvos canário
+
+
+def _cli_bank_runs(cli_invoke: Any, client: Any, tmp_path: Any) -> list[_CliRun]:
+    """Banco de questões local: no banco do canário, as 2 folhas novas com sucesso (texto e `--json`) e com erro.
+
+    Sucesso: `banks upload` do curso de fixture (copiado para o `tmp_path`) com um nome neutro, a 1ª vez em texto (a
+    versão nova) e a 2ª em `--json` (a mesma versão, `created` falso); `banks list` em `--json` (igual à listagem da
+    API) e em texto, com o filtro do nome. Erro: `banks upload` de uma pasta sem `infoCourse.json` (a recusa local,
+    com o código de uso incorreto e sem pedido à API), `banks upload` com o nome canário em `--name` (recusado pela
+    API sem eco) e `banks list` com o nome canário em `--name` (idem)."""
+    from tests.helpers import banks as bank_fixtures
+
+    runs: list[_CliRun] = []
+    run = _cli_phase_runner(cli_invoke, runs)
+    folder = bank_fixtures.copy_course(tmp_path / "banco-cli")
+    version = bank_fixtures.reference_version(bank_fixtures.course_files())
+    run(["banks", "upload", str(folder), "--name", BANK_CLI_NAME], 0)
+    again = run(["banks", "upload", str(folder), "--name", BANK_CLI_NAME], 0, json_mode=True)
+    shown = json.loads(again.stdout)
+    assert (shown["name"], shown["version"], shown["source"], shown["created"]) == (
+        BANK_CLI_NAME, version, "folder", False)
+    page = client.get("/v1/question-banks", headers=ADMIN).json()
+    listed = run(["banks", "list"], 0, json_mode=True)
+    assert json.loads(listed.stdout) == page
+    assert BANK_CLI_NAME in {item["name"] for item in page["items"]}
+    run(["banks", "list", "--name", BANK_CLI_NAME], 0)
+    not_course = bank_fixtures.write_tree(tmp_path / "banco-cli-sem-curso", {"questions/q1/info.json": b"{}\n"})
+    run(["banks", "upload", str(not_course), "--name", BANK_CLI_NAME], 2)
+    run(["banks", "upload", str(folder), "--name", ZEFIRO.name], 1)
+    run(["banks", "list", "--name", ZEFIRO.name], 1)
+    return runs
+
+
 def _cli_phase_profile(tmp_path: Any) -> tuple[Any, Any]:
     """O arquivo de perfil da fase: o local (`TEST_API_URL`, loopback com porta explícita), o local inalcançável (`http://127.0.0.1:9`,
     para a dica) e o remoto; as chaves de topo apontam para a API inalcançável (nunca o padrão `127.0.0.1:8000`)."""
@@ -6130,6 +6193,14 @@ def test_canary_sweep_finds_no_identity_or_secret_outside_reveal(
     código 0, o relatório exato sem as fixas, com as 6 globais e as 2 do host "não verificado" (`no_host_probe`),
     e 3 avisos no resumo. Varridos pelos mesmos detectores, sem exclusão a mais de varredura ou de superfície.
     No esqueleto, o `collect` não emite as 3 últimas globais e o cliente põe as fixas.
+
+    Banco de questões local: as 2 operações novas pelas `VALID_CALLS` (o envio do curso de fixture, que grava o
+    `bank.uploaded`, e a listagem), pelo 403 de cada operação e pelas `CANARY_CALLS` (o nome canário no `name` do
+    corpo, como chave do corpo, no filtro `name` e no cursor `after`, cada uma com o resultado exato em
+    `EXPECTED_CANARY`); as 2 folhas novas do CLI com sucesso e com erro (`_cli_bank_runs`: a recusa local da pasta sem
+    `infoCourse.json` e o nome canário em `--name`); `len(EVENT_TYPES) == 49`; a tabela `question_banks` na varredura
+    SQL, com linha; controles contra o vazio (as 2 folhas, o tipo novo, as chamadas canário). Nenhuma exclusão nova.
+    No esqueleto, as 2 rotas novas respondem 500 (`NotImplementedError`) e as 2 folhas lançam `NotImplementedError`.
     """
     # Disparo e resposta: todo texto da lista de textos do bot tem destino.
     _check_dispatch_text_names()
@@ -6167,6 +6238,8 @@ def test_canary_sweep_finds_no_identity_or_secret_outside_reveal(
         # CLI: no banco do canário, o `doctor` com erro (o bot sem acesso do `BOT_OFFERING`) e o
         # `events list --person`, pelo `client` do canário.
         runs += _cli_canary_db_runs(cli_invoke, seed, clock, sql)  # implantação: o relógio e o banco do oráculo
+        # Banco de questões local: as 2 folhas novas, com sucesso e com erro, no banco do canário.
+        runs += _cli_bank_runs(cli_invoke, client, tmp_path)
 
     # CLI: a fase do expurgo, do `doctor` com sucesso e dos comandos locais, num banco próprio e com captura
     # própria (ver o comentário de `DOCTOR_PURGE_OPERATIONS`); as saídas do CLI dela entram nas varreduras de `runs`.
@@ -6662,8 +6735,9 @@ def test_canary_sweep_finds_no_identity_or_secret_outside_reveal(
     assert {r.leaf for r in runs if r.exit_code != 0} >= DISPATCH_CLI_LEAVES, "folha sem invocação com erro"
     assert set(DISPATCH_EVENT_TYPES) <= set(EVENT_TYPES), (
         f"tipos fora de EventType: {sorted(set(DISPATCH_EVENT_TYPES) - set(EVENT_TYPES))}")
-    assert len(EVENT_TYPES) == 48, (
-        "os 29 tipos da API base ao vínculo do aluno, os 14 do disparo (com offering.settings_changed), os 3 dos relatórios e os 2 do CLI")
+    assert len(EVENT_TYPES) == 49, (
+        "os 29 tipos da API base ao vínculo do aluno, os 14 do disparo (com offering.settings_changed), os 3 dos relatórios, "
+        "os 2 do CLI e o do banco de questões local")
     assert set(DISPATCH_EVENT_TYPES) <= {e["type"] for e in api.events}, "tipo de evento que não saiu"
     assert DISPATCH_OUTCOMES <= outcomes, f"desfechos que não apareceram: {sorted(DISPATCH_OUTCOMES - outcomes)}"
     # Cada texto do bot saiu ao menos uma vez: toda constante e todo modelo da lista de textos do bot
@@ -6742,6 +6816,22 @@ def test_canary_sweep_finds_no_identity_or_secret_outside_reveal(
     assert {(c.op_id, c.surface) for c in CANARY_CALLS if c.op_id in DOCTOR_PURGE_OPERATIONS} | {
         (c.op_id, c.surface) for c in CANARY_CALLS if (c.op_id, c.surface) == ("events.list", "query_value_person")
     } == {key for key in EXPECTED_CANARY if key[0] in DOCTOR_PURGE_OPERATIONS or key == ("events.list", "query_value_person")}
+
+    # --- banco de questões local: contra o vazio ---
+    assert BANK_CLI_LEAVES <= tree, f"folhas fora do CLI: {sorted(BANK_CLI_LEAVES - tree)}"
+    assert {op["cli"] for op in load_catalog()["operations"] if op["id"] in BANK_OPERATIONS} == BANK_CLI_LEAVES
+    assert {r.leaf for r in runs if r.exit_code == 0} >= BANK_CLI_LEAVES, "folha sem invocação com sucesso"
+    assert {r.leaf for r in runs if r.exit_code != 0} >= BANK_CLI_LEAVES, "folha sem invocação com erro"
+    assert any(r.leaf == "banks upload" and r.exit_code == 2 for r in runs), "a recusa local do envio não rodou"
+    assert set(BANK_EVENT_TYPES) <= set(EVENT_TYPES), (
+        f"tipos fora de EventType: {sorted(set(BANK_EVENT_TYPES) - set(EVENT_TYPES))}")
+    assert set(BANK_EVENT_TYPES) <= {e["type"] for e in api.events}, "tipo de evento que não saiu no canário"
+    # A tabela nova com linha (a varredura SQL acima também exige `count > 0`): o envio de VALID_CALLS e o do CLI.
+    assert "question_banks" in SQL_SCAN, "tabela fora de SQL_SCAN: question_banks"
+    assert sql.execute("SELECT count(*) FROM question_banks").fetchone()[0] >= 2, "tabela vazia: question_banks"
+    # As chamadas canário dos bancos rodaram (o resultado exato de cada uma, conferido em `_api_phase`: 400 ou 401).
+    assert {(c.op_id, c.surface) for c in CANARY_CALLS if c.op_id in BANK_OPERATIONS} == {
+        key for key in EXPECTED_CANARY if key[0] in BANK_OPERATIONS}, "chamada canário dos bancos sem resultado esperado"
 
 
 def test_canary_surfaces_cover_published_openapi(client: Any) -> None:

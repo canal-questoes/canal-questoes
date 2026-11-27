@@ -184,6 +184,12 @@ DOCTOR_PURGE_OPERATIONS = ("system.doctor", "offerings.prepare_purge", "offering
 DOCTOR_PURGE_REQUEST_OPERATIONS = {"offerings.purge"}
 ALL_OPERATIONS += DOCTOR_PURGE_OPERATIONS
 
+# as 2 operações do banco de questões local (`ids[39:41]`, as últimas) e a única que recebe corpo
+# (a listagem é sem corpo).
+BANK_OPERATIONS = ("banks.upload", "banks.list")
+BANK_REQUEST_OPERATIONS = {"banks.upload"}
+ALL_OPERATIONS += BANK_OPERATIONS
+
 # `mcp.confirm` verdadeiro em exatamente estas operações.
 CONFIRM_OPS = {"identity.reveal", "offerings.archive"}
 # Vínculo do aluno: também a confirmação do envio em lote dos convites.
@@ -232,6 +238,9 @@ CONTRACT_REASONS = {
     "missing", "unknown_field", "invalid_format", "too_short", "too_long", "too_few", "too_many",
     "out_of_range", "invalid_value", "duplicate",
 }
+# Banco de questões local: os 5 motivos do envio da pasta (o teto de tamanho, o caminho e a entrada fora da
+# regra, a pasta que não é um curso e a versão que não confere com o pacote).
+CONTRACT_REASONS |= {"too_large", "path_not_allowed", "entry_not_allowed", "not_a_course", "mismatch"}
 PERMISSIONS = {"tokens:manage", "people:write", "people:read", "events:read", "identity:reveal",
                "offerings:read", "offerings:write", "bots:manage"}
 
@@ -415,7 +424,13 @@ EXPECTED_RESPONSE_MARKS: dict[str, dict[str, set[str]]] = {
     "system.doctor": {},
     "offerings.prepare_purge": {},
     "offerings.purge": {},
+    # Banco de questões local: o nome do banco e o `repo` (a referência `bank:<nome>`) são texto livre do
+    # operador; nenhum `x-identity` nem `x-secret` a mais.
+    "banks.upload": {"name": {"x-free-text"}, "repo": {"x-free-text"}},
+    "banks.list": {"items[].name": {"x-free-text"}, "items[].repo": {"x-free-text"}},
 }
+# Banco de questões local: o nome do banco no evento `bank.uploaded` (o campo `bank`) é texto livre.
+EXPECTED_RESPONSE_MARKS["events.list"] |= {"items[].data.bank": {"x-free-text"}}
 # Por variante de evento: só `label`, `reason` e `error` são texto livre.
 EXPECTED_EVENT_MARKS: dict[str, dict[str, set[str]]] = {
     "person.registered": {},
@@ -472,6 +487,8 @@ EXPECTED_EVENT_MARKS: dict[str, dict[str, set[str]]] = {
     # Expurgo: os 2 tipos, só contagens, sem texto livre nem identidade.
     "offering.purge_prepared": {},
     "offering.purged": {},
+    # Banco de questões local: só o nome do banco é texto livre.
+    "bank.uploaded": {"data.bank": {"x-free-text"}},
 }
 # Dados de cada tipo de evento.
 EVENT_DATA_KEYS: dict[str, set[str]] = {
@@ -536,6 +553,8 @@ EVENT_DATA_KEYS: dict[str, set[str]] = {
                                 "updates", "contact_email_set"},
     "offering.purged": {"offering_id", "identities_deleted", "identities_kept", "endpoints", "updates",
                         "free_messages_redacted", "outbox_redacted", "contact_email_deleted"},
+    # Banco de questões local: a versão enviada, com a origem, o commit (nulo na pasta) e as contagens.
+    "bank.uploaded": {"bank", "version", "source", "git_commit", "file_count", "byte_count", "question_count"},
 }
 # Valores dos campos enumerados dos eventos de oferecimentos e bots: tipo → campo →
 # valores aceitos (`None` é o nulo do JSON).
@@ -586,6 +605,8 @@ DISPATCH_EVENT_DATA_VALUES: dict[str, dict[str, set]] = {
     "submission.internal_failure": {"engine_error": {"invalid_request", "payload_too_large"}},
 }
 STUDENT_LINK_EVENT_DATA_VALUES.update(DISPATCH_EVENT_DATA_VALUES)
+# Banco de questões local: a origem da versão enviada.
+STUDENT_LINK_EVENT_DATA_VALUES["bank.uploaded"] = {"source": {"folder", "git"}}
 # Disparo e resposta: os anuláveis do `Dispatch` (por tipo, `[X, "null"]`): os horários de
 # abertura, fechamento e transição, o motivo da rejeição, a razão do cancelamento, o alvo e a prévia (e,
 # nela, o título e o rótulo e o sufixo de cada campo); o `DispatchSummary` sem a prévia.
@@ -701,6 +722,13 @@ EXPECTED_NULLABLE |= {
     "offerings.prepare_purge": {},
     "offerings.purge": {},
 }
+# Banco de questões local: o commit é nulo na versão enviada de uma pasta (na resposta, em cada item da
+# listagem e no evento `bank.uploaded`).
+EXPECTED_NULLABLE |= {
+    "banks.upload": {"git_commit": {"string", "null"}},
+    "banks.list": {"items[].git_commit": {"string", "null"}},
+}
+EXPECTED_NULLABLE["events.list"] |= {"items[].data.git_commit": {"string", "null"}}
 
 MARK_KEYS = {"x-identity", "x-secret", "x-free-text"}
 # Disparo e resposta: a marca do conteúdo de terceiros, não confiável, sempre com `x-free-text`.
@@ -854,12 +882,15 @@ def test_schema_files_cover_the_catalog() -> None:
     pedido. Vermelho: as 5 operações novas não estão no registro nem no OpenAPI publicado até a
     implementação.
 
-    CLI: 39 operações, e só `offerings.purge` soma esquema de pedido.
-    Vermelho: as 3 operações novas não estão no registro nem no OpenAPI publicado até a implementação."""
+    CLI: só `offerings.purge` soma esquema de pedido.
+    Vermelho: as 3 operações novas não estão no registro nem no OpenAPI publicado até a implementação.
+
+    Banco de questões local: 41 operações, e só `banks.upload` soma esquema de pedido. Verde no
+    esqueleto: o registro e o OpenAPI publicado já têm as 2 operações, com o corpo no envio."""
     catalog_ids = {op["id"] for op in load_catalog()["operations"]}
     assert set(CORE_OPERATIONS) <= catalog_ids
     assert catalog_ids == set(ALL_OPERATIONS)
-    assert len(ALL_OPERATIONS) == len(set(ALL_OPERATIONS)) == 39
+    assert len(ALL_OPERATIONS) == len(set(ALL_OPERATIONS)) == 41
     names = {p.name for p in _schema_files()}
 
     for op_id in catalog_ids:
@@ -876,7 +907,8 @@ def test_schema_files_cover_the_catalog() -> None:
             requests.add(match["op"])
     assert requests & set(CORE_OPERATIONS) == REQUEST_OPERATIONS
     assert requests == (REQUEST_OPERATIONS | OFFERING_BOT_REQUEST_OPERATIONS | STUDENT_LINK_REQUEST_OPERATIONS
-                        | DISPATCH_REQUEST_OPERATIONS | REPORT_REQUEST_OPERATIONS | DOCTOR_PURGE_REQUEST_OPERATIONS)
+                        | DISPATCH_REQUEST_OPERATIONS | REPORT_REQUEST_OPERATIONS | DOCTOR_PURGE_REQUEST_OPERATIONS
+                        | BANK_REQUEST_OPERATIONS)
 
     # a implementação bate com os arquivos: o registro de operações tem exatamente as operações do
     # catálogo, com modelo de pedido exatamente onde há esquema de pedido, e o OpenAPI publica todas,
@@ -1656,6 +1688,9 @@ _SAMPLE_DATA: dict[str, dict] = {
     "offering.purged": {"offering_id": UUID_SAMPLE, "identities_deleted": 2, "identities_kept": 1, "endpoints": 2,
                         "updates": 5, "free_messages_redacted": 3, "outbox_redacted": 1,
                         "contact_email_deleted": True},
+    # Banco de questões local.
+    "bank.uploaded": {"bank": "banco-teste", "version": "b" * 64, "source": "git", "git_commit": "c" * 40,
+                      "file_count": 4, "byte_count": 2048, "question_count": 1},
 }
 
 # combinações recusadas pelos refinamentos das variantes: `reason =
@@ -1864,9 +1899,13 @@ def test_events_schema_variants_match_data_model() -> None:
     demais, e uma amostra por tipo (`_SAMPLE_DATA`). Vermelho: `EventType` só ganha os 3 tipos na
     implementação.
 
-    Expurgo: 48 tipos, com `offering.purge_prepared` e `offering.purged`
+    Expurgo: `offering.purge_prepared` e `offering.purged`
     (só contagens, o horário de vencimento e os booleanos do contato), cada um com conjunto de campos distinto
-    dos demais, e uma amostra por tipo. Vermelho: `EventType` só ganha os 2 tipos na implementação."""
+    dos demais, e uma amostra por tipo. Vermelho: `EventType` só ganha os 2 tipos na implementação.
+
+    Banco de questões local: 49 tipos, com `bank.uploaded` (o banco, a versão, a origem, o commit e as
+    contagens), com conjunto de campos distinto dos demais e uma amostra. Verde no esqueleto: o
+    `EventType` já tem o tipo."""
     from cq_server.events import EventType
 
     assert {e.value for e in EventType} == set(EVENT_DATA_KEYS)
@@ -1901,7 +1940,8 @@ def test_events_schema_variants_match_data_model() -> None:
     # Mensagens livres: `offering.settings_changed`.
     # Relatórios: `report.frozen`, `notice.recorded` e `offering.digest_changed`.
     # Expurgo: `offering.purge_prepared` e `offering.purged`.
-    assert len({frozenset(keys) for keys in EVENT_DATA_KEYS.values()}) == len(EVENT_DATA_KEYS) == 48
+    # Banco de questões local: `bank.uploaded`.
+    assert len({frozenset(keys) for keys in EVENT_DATA_KEYS.values()}) == len(EVENT_DATA_KEYS) == 49
     assert set(_SAMPLE_DATA) == set(EVENT_DATA_KEYS)
     by_type = {v["properties"]["type"]["const"]: v["properties"]["data"] for v in variants}
     for event_type, fields in (OFFERING_BOT_EVENT_DATA_VALUES | STUDENT_LINK_EVENT_DATA_VALUES).items():

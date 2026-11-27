@@ -42,6 +42,8 @@ Pilha local e agente:
   a sua aprovação e como validar a instalação.
 - [Observabilidade](operacao/observabilidade.md): o que existe hoje para acompanhar o sistema: o diagnóstico do
   `cq doctor`, os registros redigidos dos contêineres, o log de eventos e as métricas do piloto.
+- [Banco de questões local](operacao/banco-local.md): enviar ao sistema uma pasta de curso ou um commit de um git
+  local com `cq banks upload`, os limites, o que fica guardado e a linha pronta do disparo.
 
 Implantação e dados:
 

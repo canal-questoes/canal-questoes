@@ -25,30 +25,38 @@ O sistema tem dois tipos de usuário e se relaciona com cinco sistemas externos.
 Os sistemas externos:
 
 - os sistemas que geram e gerem as questões podem enviar as referências e os pedidos de disparo pela API do sistema;
-- os repositórios de questões do PrairieLearn, versionados em git, fornecem o código de cada questão;
+- os cursos do PrairieLearn fornecem o código de cada questão: um repositório git remoto ou, enviado pelo operador,
+  uma pasta de curso do computador dele, com ou sem git;
 - a Bot API do Telegram e um servidor de e-mail (SMTP) são os meios de entrega;
 - um serviço de feedback elaborado, previsto para o futuro, poderá ler os eventos do sistema pela API.
 
 Uma propriedade do contexto orienta o resto da arquitetura: **o banco de questões é opaco para o sistema**. O
-canal-questoes não armazena, não edita e não gera questões. Ele recebe só referências imutáveis, formadas pelo
-repositório (uma URL `https`), pelo *commit* e pelo identificador da questão no curso (o QID). A referência aponta o
-repositório do curso inteiro, e não só a pasta da questão, porque uma questão pode depender de bibliotecas e de
-elementos definidos no nível do curso. Fixar o *commit* torna o disparo reprodutível, mesmo que a questão mude depois
-no repositório.
+canal-questoes não edita, não gera nem interpreta questões. Ele recebe só referências imutáveis, formadas pelo banco,
+pela versão fixada e pelo identificador da questão no curso (o QID), e entrega o conteúdo ao motor. O banco chega de
+duas formas:
+
+- um repositório git, por uma URL `https`, num *commit*;
+- um banco enviado pelo operador, com a referência `bank:<nome>`: o CLI ou o servidor MCP leem a pasta do curso ou um
+  *commit* de um git local, empacotam e enviam à API, e o servidor guarda o pacote, imutável, identificado pelo hash
+  SHA-256 do conteúdo, que faz o papel do *commit*. Só o cliente lê o git local; o núcleo continua sem git.
+
+A referência aponta o curso inteiro, e não só a pasta da questão, porque uma questão pode depender de bibliotecas e de
+elementos definidos no nível do curso. Fixar a versão torna o disparo reprodutível, mesmo que a questão mude depois
+no repositório ou na pasta do operador.
 
 ## Contêineres e comunicação
 
 O sistema é formado por quatro contêineres, orquestrados pelo Docker Compose ([`compose.yaml`](../../compose.yaml)).
 
 ![Contêineres api, worker, engine e postgres, o volume dos repositórios e os sistemas externos (CLI e servidor MCP,
-integrações, Telegram, e-mail, repositórios)](../diagramas/c4-containers.svg)
+integrações, Telegram, e-mail, repositórios, o banco local do operador)](../diagramas/c4-containers.svg)
 
 | Contêiner | Imagem | Papel |
 | --- | --- | --- |
 | `api` | a do sistema (Python 3.12, FastAPI) | a API HTTP de administração, das integrações, dos relatórios e da revelação de identidade; não guarda estado e nunca fala com o motor |
-| `worker` | a mesma imagem da `api` | recebe as atualizações do Telegram, agenda e consome as tarefas, envia as mensagens e os e-mails, baixa os repositórios de questões e chama o motor |
+| `worker` | a mesma imagem da `api` | recebe as atualizações do Telegram, agenda e consome as tarefas, envia as mensagens e os e-mails, obtém os repositórios de questões (baixa do git ou publica o banco enviado) e chama o motor |
 | `engine` | a oficial do PrairieLearn, com o orquestrador do sistema | executa as questões; não guarda estado, não acessa a rede externa e roda sem privilégios |
-| `postgres` | a oficial do PostgreSQL 18 | guarda o estado, o log de eventos e as filas |
+| `postgres` | a oficial do PostgreSQL 18 | guarda o estado, o log de eventos, as filas e os pacotes dos bancos enviados |
 
 A comunicação entre eles, pela intenção, com a implementação entre parênteses:
 
@@ -58,8 +66,9 @@ A comunicação entre eles, pela intenção, com a implementação entre parênt
 - o worker é avisado das mudanças de configuração, como a ativação de um bot (com `LISTEN` e `NOTIFY`, cujo aviso só
   é entregue depois que a transação é confirmada);
 - o worker chama o motor por requisições HTTP síncronas, numa rede interna só dele e do motor;
-- o motor lê os repositórios de questões de um volume montado só para leitura; quem os baixa do git é o worker, o
-  único que escreve nesse volume.
+- o motor lê os repositórios de questões de um volume montado só para leitura; quem os põe lá é o worker, o único
+  que escreve nesse volume: ele baixa os repositórios do git e publica os bancos enviados a partir do pacote guardado
+  no PostgreSQL.
 
 A API é publicada só no endereço local do host (`127.0.0.1`, porta 8000 por padrão, mudada por `CQ_API_PORT`). O
 acesso de outra máquina, pela linha de comando ou pelo agente, passa por um túnel SSH, com um perfil remoto.
@@ -84,7 +93,8 @@ O isolamento do motor decorre da segunda razão. No `compose.yaml`, o contêiner
 Esse isolamento protege o resto do sistema, mas não separa as questões umas das outras. O código de uma questão pode
 ler os outros repositórios montados e, nos pedidos simultâneos, dados de outros alunos, e devolver isso no enunciado,
 no feedback ou nos erros de formato. Por isso o sistema só aceita repositórios de hosts permitidos
-(`CQ_REPO_ALLOWED_HOSTS`; vazia, recusa todos) e deve receber só questões de autores confiáveis. Executar questões de
+(`CQ_REPO_ALLOWED_HOSTS`; vazia, recusa todos) e bancos enviados com um token que tenha a permissão de escrita
+(`offerings:write`), e deve receber só questões de autores confiáveis. Executar questões de
 autores não confiáveis exigiria um usuário separado para o código da questão, o que fica como trabalho futuro.
 
 ## Núcleo, portas e adaptadores
@@ -99,7 +109,7 @@ contrato confere que os módulos do núcleo não importam bibliotecas HTTP, a ca
 | motor de questões (`QuestionEngine`) | o cliente HTTP do motor PrairieLearn | uma reimplementação de um subconjunto do PL; outros formatos de questão |
 | canal de entrega (`DeliveryChannel`) | o Telegram; o console, para testes | outros mensageiros |
 | canal de verificação (`VerificationChannel`) | o e-mail, por SMTP | SMS, WhatsApp |
-| obtenção de repositórios (`RepoFetcher`) | o git, por `https` | — |
+| obtenção de repositórios (`RepoFetcher`) | o git, por `https`; a publicação dos bancos enviados, a partir do pacote guardado | — |
 | dialeto do canal (`MessageFormatter`) | a formatação do Telegram nos modos `rich` e `html`; o texto puro, no console | — |
 | sonda do servidor de e-mail (`MailServerProbe`) | o teste de conexão do SMTP, sem envio | — |
 | relatórios (`ReportRenderer`) | o JSON, o CSV e o resumo no chat do bot | o relatório formatado |
@@ -191,8 +201,8 @@ Um disparo atravessa os contêineres assim:
 
 1. **Preparo.** A API recebe o pedido de disparo (a referência, a abertura e o fechamento), grava-o e enfileira a
    validação; ela nunca chama o motor. Sem horário de abertura, o disparo é imediato.
-2. **Validação.** O worker baixa o *commit* da questão, pede ao motor a inspeção e uma variante de amostra. Uma
-   questão não suportada rejeita o disparo.
+2. **Validação.** O worker obtém a versão fixada da questão (baixa o *commit* do git ou publica o banco enviado),
+   pede ao motor a inspeção e uma variante de amostra. Uma questão não suportada rejeita o disparo.
 3. **Confirmação.** Validado, o disparo espera a confirmação do operador, a segunda das duas fases. Antes da
    abertura, o operador pode cancelar o disparo (`cq dispatches cancel`), e o disparo validado e não confirmado no
    prazo expira.
@@ -270,7 +280,7 @@ agente pela entrada e saída padrão (*stdio*).
 Toda operação da API entra num **catálogo único** ([`catalog.json`](../../contracts/api/v1/catalog.json)), que liga
 cada uma ao endpoint, ao comando `cq` e, quando faz sentido, à ferramenta MCP
 ([`tools.json`](../../contracts/mcp/v1/tools.json)). As ferramentas expostas ao agente são curadas por caso de uso, e
-não geradas automaticamente da API. A versão 1 do contrato tem 36 ferramentas: 31 operações do catálogo e 5 da pilha
+não geradas automaticamente da API. A versão 1 do contrato tem 38 ferramentas: 33 operações do catálogo e 5 da pilha
 local.
 
 No agente, as operações com efeito difícil de desfazer são feitas em **duas fases**: preparar, que mostra o efeito,

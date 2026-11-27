@@ -265,6 +265,11 @@ cq dispatches confirm tutorial <id do disparo>
 Como o `prepare` não levou `--opens-at`, o disparo é imediato: a saída diz que ele abre agora e quando fecha. Um
 disparo imediato validado precisa ser confirmado em até 24 horas.
 
+**Nota.** Este tutorial dispara pelo repositório de demonstração. Para disparar uma questão de um curso que está numa
+pasta do seu computador, sem publicá-lo num repositório, envie a pasta antes com `cq banks upload` e prepare o disparo
+com a referência `bank:<nome>` e a versão devolvida; o passo a passo está no
+[guia do banco de questões local](../operacao/banco-local.md).
+
 ## 10. Responder pelo Telegram
 
 A questão chega na conversa com o bot. Responda pelos botões da questão ou, nos campos de texto e de número,

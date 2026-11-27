@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://canal-questoes.invalid/contracts/api/v1/schemas/banks.upload.request.schema.json",
+  "title": "POST /v1/question-banks — pedido",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "name",
+    "version",
+    "source",
+    "archive"
+  ],
+  "properties": {
+    "name": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 40,
+      "pattern": "^[a-z0-9][a-z0-9-]{2,39}$"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "source": {
+      "enum": [
+        "folder",
+        "git"
+      ]
+    },
+    "git_commit": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^([0-9a-f]{40}|[0-9a-f]{64})$"
+    },
+    "archive": {
+      "type": "string",
+      "minLength": 4,
+      "maxLength": 178956972,
+      "pattern": "^[A-Za-z0-9+/]*={0,2}$",
+      "contentEncoding": "base64",
+      "contentMediaType": "application/gzip"
+    }
+  },
+  "if": {
+    "properties": {
+      "source": {
+        "const": "git"
+      }
+    }
+  },
+  "then": {
+    "required": [
+      "git_commit"
+    ],
+    "properties": {
+      "git_commit": {
+        "type": "string"
+      }
+    }
+  },
+  "else": {
+    "properties": {
+      "git_commit": {
+        "type": "null"
+      }
+    }
+  }
+}

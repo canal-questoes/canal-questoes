@@ -23,10 +23,13 @@ como a `build_verification` (aviso único no logger `cq_server.worker`, `ConfigE
 sem ler `os.environ` nem configurar o logging; nenhuma conexão). O `worker` as chama **só depois** de a
 verificação do e-mail ter sucesso, nessa ordem, e por último lê `DeliverySettings.from_env`; cada
 `ConfigError` sai como o do `Settings` (`config.invalid`, código 2). O resultado vai ao `run_worker(engine=…,
-fetcher=…, delivery=…)`. O `serve` lê `RepoSettings.from_env` **antes** da migração (`ConfigError` →
-`config.invalid`, código 2) e passa a lista de hosts ao `create_app(…, repo_settings=…)`. Os adaptadores
-do motor e do git (`adapters.engine`, `adapters.git`) só são importados aqui dentro, na raiz de composição; o
-`GitTestOptions` (só dos testes) não tem caminho por aqui.
+fetcher=…, delivery=…)`. Depois da obtenção pelo git, `build_bank_fetcher(env, settings)` monta a publicação dos
+bancos de questões enviados, na mesma raiz (`None` sem raiz utilizável, sem aviso próprio), e o resultado vai ao
+`run_worker(bank_fetcher=…)`; o `fetcher` continua o da obtenção pelo git. O `serve` lê
+`RepoSettings.from_env` **antes** da migração (`ConfigError` → `config.invalid`, código 2) e passa a lista de
+hosts ao `create_app(…, repo_settings=…)`. Os adaptadores do motor, do git e dos bancos (`adapters.engine`,
+`adapters.git`, `adapters.banks`) só são importados aqui dentro, na raiz de composição; o `GitTestOptions` (só
+dos testes) não tem caminho por aqui.
 
 Sonda do e-mail: `build_mail_probe(env, settings, probe)` monta o laço da
 sonda do servidor de e-mail (`CQ_MAIL_PROBE_INTERVAL_SECONDS`, inteiro positivo, padrão 21600), sem ler
@@ -78,6 +81,7 @@ from cq_server.clock import SystemClock
 from cq_server.logs import configure_logging
 
 if TYPE_CHECKING:
+    from cq_server.adapters.banks import BankRepoFetcher
     from cq_server.bots import BotRuntime
     from cq_server.mail_probe import MailProbeLoop
     from cq_server.ports.engine import QuestionEngine
@@ -266,6 +270,33 @@ def build_repo_fetcher(env: Mapping[str, str], settings: Settings) -> RepoFetche
     return GitRepoFetcher(repo)
 
 
+def build_bank_fetcher(env: Mapping[str, str], settings: Settings) -> BankRepoFetcher | None:
+    """A publicação dos bancos de questões enviados no worker (as referências `bank:`), com a mesma raiz e os
+    mesmos tetos da obtenção pelo git e o pacote carregado do PostgreSQL por uma conexão curta; sem raiz
+    utilizável, `None`, sem registro próprio (o aviso é o da obtenção pelo git). O adaptador só é importado
+    aqui dentro.
+
+    O carregador abre uma conexão curta por publicação (`application_name = cq-worker/banks`), só de leitura, e a
+    fecha ao devolver o pacote ou `BankMissing`; a falha de conexão ou de consulta sobe ao adaptador, que a
+    transforma em falha temporária pelo tipo da exceção. Nada conecta na montagem."""
+    repo = RepoSettings.from_env(env)
+    if repo.repos_root is None or not _usable_root(repo.repos_root):
+        return None
+    from psycopg.conninfo import make_conninfo
+
+    from cq_server import db
+    from cq_server.adapters.banks import BankRepoFetcher
+    from cq_server.banks import BankMissing, load_archive
+
+    conninfo = make_conninfo(settings.database_url, application_name="cq-worker/banks")
+
+    def load(name: str, version: str) -> bytes | BankMissing:
+        with db.connect(conninfo, autocommit=True) as conn:
+            return load_archive(conn, name, version)
+
+    return BankRepoFetcher(repo, load)
+
+
 def _sweep_staging(fetcher: RepoFetcher | None) -> None:
     """Na partida do worker, com a obtenção: remove as sobras de `.staging` com mais de 1 hora
     (as de uma obtenção interrompida). A falha de disco só vira um aviso com o tipo do erro (sem caminho), e o
@@ -369,6 +400,8 @@ def _cmd_worker(settings: Settings, bots: BotRuntime) -> int:
         return EXIT_USAGE
     try:
         fetcher = build_repo_fetcher(os.environ, settings)
+        # A publicação dos bancos enviados, na mesma raiz; o `fetcher` segue o da obtenção pelo git, intacto.
+        bank_fetcher = build_bank_fetcher(os.environ, settings)
         delivery = DeliverySettings.from_env(os.environ)
         # Só esta partida liga a sonda do e-mail, com o canal do `build_verification` (ou
         # `None` sem e-mail: grava `not_configured` sem conexão); o intervalo inválido sai como os demais.
@@ -386,7 +419,7 @@ def _cmd_worker(settings: Settings, bots: BotRuntime) -> int:
     def target() -> None:
         try:
             run_worker(settings, stop=stop, bots=bots, verification=verification, engine=engine,
-                       fetcher=fetcher, delivery=delivery, mail_probe=mail_probe)
+                       fetcher=fetcher, bank_fetcher=bank_fetcher, delivery=delivery, mail_probe=mail_probe)
         except BaseException as exc:  # noqa: BLE001 - registrado e convertido em código de saída
             failure.append(exc)
             logger.error("o worker parou com erro", exc_info=exc)

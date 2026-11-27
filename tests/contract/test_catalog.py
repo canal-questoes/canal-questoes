@@ -326,6 +326,19 @@ EXPECTED_OPERATIONS: dict[str, dict] = {
         "mcp": {"exposed": True, "tool": "purge_offering", "confirm": True},
         "destructive": True,
     },
+    # o banco de questões local: o envio da pasta e a listagem das versões, no fim do catálogo.
+    "banks.upload": {
+        "method": "POST", "path": "/v1/question-banks", "permission": "offerings:write",
+        "cli": "banks upload",
+        "mcp": {"exposed": True, "tool": "upload_question_bank", "confirm": False},
+        "destructive": False,
+    },
+    "banks.list": {
+        "method": "GET", "path": "/v1/question-banks", "permission": "offerings:read",
+        "cli": "banks list",
+        "mcp": {"exposed": True, "tool": "list_question_banks", "confirm": False},
+        "destructive": False,
+    },
 }
 
 FORBIDDEN_PARAM_NAMES = {"token", "secret", "bot_token"}
@@ -449,14 +462,17 @@ def test_catalog_matches_contract_table() -> None:
     dos relatórios em `ids[31:36]`, na ordem da tabela, sem `confirm` e sem permissão a mais.
     Vermelho: as 5 operações não estão no registro nem no OpenAPI publicado.
 
-    CLI: 39 operações; as 5 dos relatórios em `ids[31:36]` e as 3 do CLI em
-    `ids[36:]`, na ordem da tabela; `confirm: true` em exatamente `identity.reveal`,
+    CLI: as 5 dos relatórios em `ids[31:36]` e as 3 do CLI em
+    `ids[36:39]`, na ordem da tabela; `confirm: true` em exatamente `identity.reveal`,
     `offerings.archive`, `invites.send`, `dispatches.confirm` e `offerings.purge`; as mesmas 8 permissões.
-    Vermelho: as 3 operações não estão no registro nem no OpenAPI publicado."""
+    Vermelho: as 3 operações não estão no registro nem no OpenAPI publicado.
+
+    Banco de questões local: 41 operações; as 2 do banco em `ids[39:]` (o envio e a listagem), sem
+    `confirm` e sem permissão a mais. Verde no esqueleto: o registro e o OpenAPI já têm as 2."""
     catalog = load_catalog()
     assert catalog["version"] == "1"
     ids = [op["id"] for op in catalog["operations"]]
-    assert len(ids) == len(set(ids)) == 39
+    assert len(ids) == len(set(ids)) == 41
     assert {op["id"]: {k: v for k, v in op.items() if k != "id"} for op in catalog["operations"]} \
         == EXPECTED_OPERATIONS
     assert [op["id"] for op in catalog["operations"] if op["mcp"].get("confirm") is True] == [
@@ -473,7 +489,9 @@ def test_catalog_matches_contract_table() -> None:
     # as 5 dos relatórios em `ids[31:36]`; por último, as 3 do CLI.
     assert ids[31:36] == ["reports.get", "reports.list_versions", "reports.resend_summary", "offerings.get_digest",
                           "offerings.update_digest"]
-    assert ids[36:] == ["system.doctor", "offerings.prepare_purge", "offerings.purge"]
+    assert ids[36:39] == ["system.doctor", "offerings.prepare_purge", "offerings.purge"]
+    # as 2 do banco de questões local, no fim.
+    assert ids[39:] == ["banks.upload", "banks.list"]
     from cq_server.permissions import Permission
 
     permissions = {op["permission"] for op in catalog["operations"]} - {None}

@@ -58,8 +58,9 @@ NO_HANDLER_ERROR = "sem tratador para o tipo de tarefa"  # a mensagem de `cq_ser
 # `0004`, a do disparo e da resposta;
 # `0005`, a dos relatórios;
 # `0006`, a do expurgo e do CLI;
-# `0007`, a da implantação (`0007_mail_probe.sql`).
-CURRENT_SCHEMA_VERSION = "0007"
+# `0007`, a da implantação (`0007_mail_probe.sql`);
+# `0008`, a do banco de questões local (`0008_question_banks.sql`).
+CURRENT_SCHEMA_VERSION = "0008"
 SYSTEM_OFFERING = "sistema-oferta"
 # Registros do worker com bots que não podem aparecer com a chave-mestra no ar e
 # sem nenhum bot: sem chave (`worker.bots_disabled`), posse ou problema de consulta.

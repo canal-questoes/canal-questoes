@@ -499,6 +499,32 @@
         "confirm": true
       },
       "destructive": true
+    },
+    {
+      "id": "banks.upload",
+      "method": "POST",
+      "path": "/v1/question-banks",
+      "permission": "offerings:write",
+      "cli": "banks upload",
+      "mcp": {
+        "exposed": true,
+        "tool": "upload_question_bank",
+        "confirm": false
+      },
+      "destructive": false
+    },
+    {
+      "id": "banks.list",
+      "method": "GET",
+      "path": "/v1/question-banks",
+      "permission": "offerings:read",
+      "cli": "banks list",
+      "mcp": {
+        "exposed": true,
+        "tool": "list_question_banks",
+        "confirm": false
+      },
+      "destructive": false
     }
   ]
 }

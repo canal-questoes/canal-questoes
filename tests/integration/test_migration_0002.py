@@ -174,23 +174,25 @@ def _message(conn: psycopg.Connection, **destination: Any) -> int:
 
 def test_expected_version_and_packaged_migrations(empty_db_url: str) -> None:
     """Nova migração versionada, aplicada como na API base, e as migrações seguintes
-    (vínculo do aluno, disparo, relatórios, CLI e implantação), cada uma com a sua migração
-    (cabeçalho: `EXPECTED_VERSION = "0007"`): o pacote tem exatamente `0001`, `0002`, `0003`, `0004`,
-    `0005`, `0006` e `0007`; num banco vazio, `apply_migrations` aplica as sete, em ordem, e a versão
-    atual passa a `0007`."""
+    (vínculo do aluno, disparo, relatórios, CLI, implantação e banco de questões), cada uma com a sua
+    migração (cabeçalho: `EXPECTED_VERSION = "0008"`): o pacote tem exatamente `0001`, `0002`, `0003`,
+    `0004`, `0005`, `0006`, `0007` e `0008`; num banco vazio, `apply_migrations` aplica as oito, em
+    ordem, e a versão atual passa a `0008`."""
     # A versão do esquema é literal global.
     # A cada migração nova, só os literais de versão e de lista mudam
     # (a `0004` do disparo e resposta,
     # a `0005` dos relatórios e acompanhamento,
-    # a `0006` do CLI
-    # e a `0007` da implantação e piloto):
-    # a versão atual é a `0007`,
-    # e o pacote tem as sete migrações, em ordem.
-    assert EXPECTED_VERSION == "0007"
+    # a `0006` do CLI,
+    # a `0007` da implantação e piloto
+    # e a `0008` do banco de questões local):
+    # a versão atual é a `0008`,
+    # e o pacote tem as oito migrações, em ordem.
+    assert EXPECTED_VERSION == "0008"
     assert [version for version, _ in packaged_migration_files()] == ["0001", "0002", "0003", "0004",
-                                                                      "0005", "0006", "0007"]
-    assert apply_migrations(empty_db_url) == ["0001", "0002", "0003", "0004", "0005", "0006", "0007"]
-    assert current_version(empty_db_url) == "0007"
+                                                                      "0005", "0006", "0007", "0008"]
+    assert apply_migrations(empty_db_url) == ["0001", "0002", "0003", "0004", "0005", "0006", "0007",
+                                              "0008"]
+    assert current_version(empty_db_url) == "0008"
 
 
 def _seed_core(conn: psycopg.Connection) -> None:
@@ -234,13 +236,13 @@ def _seed_core(conn: psycopg.Connection) -> None:
 def test_0002_over_core_database_preserves_rows_and_sequences(empty_db_url: str) -> None:
     """As linhas da API base continuam válidas sem mudança com o esquema de oferecimentos e bots;
     migração sobre dados da API base: um banco em `0001` com esses dados recebe a `0002` pela
-    função do sistema, que devolve `["0002", "0003", "0004", "0005", "0006", "0007"]`; cada linha do
-    banco antigo fica
+    função do sistema, que devolve `["0002", "0003", "0004", "0005", "0006", "0007", "0008"]`; cada
+    linha do banco antigo fica
     igual (todas as colunas da API base), as 3 colunas novas de `outbox_messages` ficam nulas nas linhas
     antigas, as 6 tabelas novas nascem vazias, as sequências continuam depois do maior id e
     `schema_migrations` ganha a `0002`, a `0003` (vínculo do aluno), a `0004` (disparo), a `0005`
-    (relatórios), a `0006` (CLI) e a `0007` (implantação); aplicar de novo não
-    muda nada."""
+    (relatórios), a `0006` (CLI), a `0007` (implantação) e a `0008` (banco de questões); aplicar de
+    novo não muda nada."""
     assert apply_up_to(empty_db_url, "0001") == ["0001"]
     with psycopg.connect(empty_db_url, autocommit=True) as conn:
         _seed_core(conn)
@@ -253,10 +255,11 @@ def test_0002_over_core_database_preserves_rows_and_sequences(empty_db_url: str)
 
     # A função do sistema aplica também as migrações seguintes: a `0003` (vínculo do aluno),
     # a `0004` (disparo), a `0005` (relatórios),
-    # a `0006` (CLI)
-    # e a `0007` (implantação).
-    assert apply_migrations(empty_db_url) == ["0002", "0003", "0004", "0005", "0006", "0007"]
-    assert current_version(empty_db_url) == "0007"
+    # a `0006` (CLI),
+    # a `0007` (implantação)
+    # e a `0008` (banco de questões).
+    assert apply_migrations(empty_db_url) == ["0002", "0003", "0004", "0005", "0006", "0007", "0008"]
+    assert current_version(empty_db_url) == "0008"
 
     with psycopg.connect(empty_db_url, autocommit=True) as conn:
         after = {table: _snapshot(conn, table, columns) for table, columns in CORE_COLUMNS.items()}
@@ -264,7 +267,7 @@ def test_0002_over_core_database_preserves_rows_and_sequences(empty_db_url: str)
             k: v for k, v in before.items() if k != "schema_migrations"}
         assert after["schema_migrations"][:1] == before["schema_migrations"]
         assert [row[0] for row in after["schema_migrations"]] == ["0001", "0002", "0003", "0004",
-                                                                  "0005", "0006", "0007"]
+                                                                  "0005", "0006", "0007", "0008"]
         assert conn.execute(
             "SELECT bot_id, delivery_endpoint_id, reply_to_update_id FROM outbox_messages ORDER BY id"
         ).fetchall() == [(None, None, None)] * 3
@@ -309,9 +312,9 @@ def test_core_message_is_still_enqueued_with_core_columns_only(sql: psycopg.Conn
     # colunas novas da fila são anuláveis ou com padrão, e o CHECK de destino não muda.
     # Nos relatórios (a `0005`), as colunas novas da
     # fila (`notice_id`, `text_format`) são anuláveis, e a forma de texto do CHECK aceita a linha da API base.
-    # O CLI (a `0006`) e a implantação (a `0007`) não mudam a fila.
-    # A versão atual é a `0007`.
-    assert current_version(db_url) == "0007"
+    # O CLI (a `0006`), a implantação (a `0007`) e o banco de questões (a `0008`) não mudam a fila.
+    # A versão atual é a `0008`.
+    assert current_version(db_url) == "0008"
     pseudo_id = uuid.uuid4()
     person = _insert(sql, "people", pseudo_id=pseudo_id, alias="abcdef01", created_at=T0)
     with psycopg.connect(db_url) as conn:

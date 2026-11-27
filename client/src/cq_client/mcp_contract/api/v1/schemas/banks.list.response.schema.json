@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://canal-questoes.invalid/contracts/api/v1/schemas/banks.list.response.schema.json",
+  "title": "GET /v1/question-banks — 200",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "items",
+    "next_cursor"
+  ],
+  "properties": {
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "version",
+          "repo",
+          "source",
+          "git_commit",
+          "file_count",
+          "byte_count",
+          "question_count",
+          "created_at"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "x-free-text": true
+          },
+          "version": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "repo": {
+            "type": "string",
+            "minLength": 1,
+            "x-free-text": true
+          },
+          "source": {
+            "enum": [
+              "folder",
+              "git"
+            ]
+          },
+          "git_commit": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^([0-9a-f]{40}|[0-9a-f]{64})$"
+          },
+          "file_count": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 20000
+          },
+          "byte_count": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 104857600
+          },
+          "question_count": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 20000
+          },
+          "created_at": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,6})?Z$"
+          }
+        }
+      }
+    },
+    "next_cursor": {
+      "type": "integer",
+      "minimum": 0
+    }
+  }
+}

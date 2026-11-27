@@ -10,6 +10,49 @@ coisa pode mudar de uma versão para a outra.
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-11-26
+
+Versão com uma funcionalidade nova, o banco de questões local: o operador envia ao sistema um curso do PrairieLearn
+que está numa pasta do computador dele, ou um commit de um git local, pelo `cq banks upload` ou pela ferramenta do
+servidor MCP, e dispara as questões dele com a referência `bank:<nome>`. Os disparos de um repositório git remoto
+continuam como estavam. Na atualização a partir da 0.1.2, a api aplica ao subir a migração nova do banco de dados, que
+cria a tabela dos bancos enviados.
+
+### Adicionado
+
+- **Banco de questões local:** um curso do PrairieLearn que está numa pasta do computador do operador pode ser enviado
+  ao sistema e disparado sem passar por um repositório remoto. O `cq banks upload <pasta> --name <nome>` lê a pasta,
+  confere, empacota e envia o banco; com `--git <revisão>`, envia o commit dessa revisão do git local em vez da pasta
+  como está. A versão é o SHA-256 do conteúdo, e o disparo usa a referência `bank:<nome>` com essa versão no lugar do
+  commit. O `cq banks list` lista os bancos enviados e as versões de cada um, com filtro opcional pelo nome exato.
+- **Agente:** as ferramentas `upload_question_bank`, que lê a pasta (ou, com `git_rev`, o commit do git local) no
+  processo do servidor MCP, sem passar o conteúdo pelo modelo, e `list_question_banks`; a skill de disparo do plugin
+  passa a enviar o banco local antes do preparo.
+- **API:** as operações `banks.upload` (`POST /v1/question-banks`), com a permissão `offerings:write`, e
+  `banks.list` (`GET /v1/question-banks`), com a `offerings:read`, e os motivos novos das recusas do envio.
+- **Eventos:** o tipo novo `bank.uploaded`, gravado no primeiro envio de cada versão de um banco, com o nome, a
+  versão, a origem, o commit e as contagens, sem conteúdo nem nome de arquivo do banco; o log passa a ter 49 tipos de
+  evento, e a listagem de eventos aceita o tipo novo no filtro.
+- **Banco de dados:** a migração 0008 cria a tabela dos bancos enviados, com um pacote imutável por nome e versão.
+- **Documentação:** o [guia do banco de questões local](docs/operacao/banco-local.md); a política de retenção diz que
+  o banco enviado fica guardado enquanto o sistema existir, e o tutorial de primeiro uso ganha uma nota na seção do
+  disparo. As referências da API, do CLI, do MCP e dos tipos de questão, o guia de observabilidade e o diagrama de
+  contêineres passam a incluir o banco enviado.
+
+### Modificado
+
+- **Número da versão:** os pacotes `cq-server` e `cq-client` e o plugin do Claude Code passam a 0.1.3, e é esse o
+  número que a saúde da API (`GET /health`, `cq health` e `cq status`) e o servidor MCP mostram.
+- **Princípios** ([`docs/explicacao/principios.md`](docs/explicacao/principios.md)): no princípio V, o banco de
+  questões continua opaco (o sistema não gere nem interpreta o conteúdo dele), mas chega de duas formas: um
+  repositório git remoto num commit ou um banco enviado pelo operador, guardado imutável e identificado pelo SHA-256
+  do conteúdo; só o cliente lê o git local. O documento passa a citar a versão 1.1.0 do documento interno de
+  princípios, que ganhou essa emenda.
+- **Explicações da arquitetura e das decisões e README:** deixam de dizer que o sistema não guarda questões e passam a
+  descrever as duas formas de o banco chegar, com o pacote enviado guardado imutável; o banco continua opaco, e o
+  sistema não edita, não gera nem interpreta as questões. As explicações também contam as duas ferramentas novas do
+  MCP.
+
 ## [0.1.2] - 2026-11-24
 
 Versão de manutenção: o Docker Engine mínimo sobe para o 26.0.2, por uma falha de segurança do 26.0.0 e do 26.0.1; o

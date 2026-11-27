@@ -42,6 +42,12 @@ com a API fora do ar, o `doctor` não termina com o código 3 e a mensagem únic
 verificações (`api.reachable` em `failure`) e a ajuda, cobertos em `tests/cli/test_cli_doctor.py`;
 só ela fica fora do conjunto. No esqueleto, sem os comandos, os casos do expurgo terminam com o erro de uso
 do `click` (código 2), e não com o 3; os demais casos da mesma função passam.
+
+Banco de questões local: `_SAMPLE_ARGS` tem os 2 comandos (`banks upload PASTA --name NOME` e `banks list`,
+com o filtro e a paginação), para que a API fora do ar (código 3) valha também neles. O `banks upload` lê,
+confere e empacota a pasta antes de chamar a API: a pasta de exemplo é uma cópia do curso de fixture, válida
+pelas regras do banco, no mesmo diretório temporário do token do bot. No esqueleto, a leitura da pasta e a
+listagem lançam `NotImplementedError`, e esses casos não terminam com o 3.
 """
 
 from __future__ import annotations
@@ -78,6 +84,7 @@ from tests.helpers.api import (
     uuid4_with_prefix,
 )
 from tests.helpers.api import write_roster
+from tests.helpers.banks import copy_course
 from tests.helpers.calls import DUMMY_BOT_TOKEN
 from tests.helpers.canary import find_secrets
 from tests.helpers.clock import iso
@@ -961,6 +968,9 @@ with open(_BOT_TOKEN_FILE, "w", encoding="utf-8", newline="\n") as _token_out:
 # chamar a API; cabeçalho `ra,nome,email` e uma linha neutra, no formato aceito pelo leitor.
 _ROSTER_FILE = str(write_roster(os.path.join(_BOT_TOKEN_DIR, "lista-da-turma.csv"), [
     {"ra": "5512340001", "name": "Nome Inventado Da Lista", "email": "pessoa.da.lista@turma.example.org"}]))
+# Pasta do banco: a pasta que `banks upload` lê, confere e empacota antes de chamar a API; uma cópia do
+# curso de fixture (a origem não muda).
+_BANK_FOLDER = str(copy_course(os.path.join(_BOT_TOKEN_DIR, "banco-local")))
 
 _SAMPLE_ARGS: dict[str, list[str]] = {
     "health": ["health"],
@@ -1017,6 +1027,9 @@ _SAMPLE_ARGS: dict[str, list[str]] = {
     "offerings purge prepare": ["offerings", "purge", "prepare", _ANY_OFFERING_REF],
     "offerings purge confirm": ["offerings", "purge", "confirm", _ANY_OFFERING_REF,
                                 "--confirmation", "Aa0_-Aa0_-Aa0_-Aa0_-Zz"],
+    # O envio de uma pasta de banco local e a listagem das versões.
+    "banks upload": ["banks", "upload", _BANK_FOLDER, "--name", "banco-teste"],
+    "banks list": ["banks", "list", "--name", "banco-teste", "--after", "0", "--limit", "10"],
 }
 # A folha `doctor` (`system.doctor`) fica fora: com a API fora do ar, ela
 # relata as verificações em vez de terminar com o código 3 (coberta em `tests/cli/test_cli_doctor.py`).
@@ -1032,7 +1045,8 @@ def test_api_unreachable(command, json_mode, cli_invoke, monkeypatch):
     antes de chamar a API), os 6 do disparo e resposta, os 5 dos relatórios
     (`reports show`, `reports versions`,
     `reports resend`, `offerings digest show` e `offerings digest set`) e os
-    2 comandos do expurgo (`offerings purge prepare` e `offerings purge confirm`);
+    2 comandos do expurgo (`offerings purge prepare` e `offerings purge confirm`)
+    e os 2 do banco local (o `banks upload` lê a pasta, válida, antes de chamar a API);
     o `doctor` fica fora (`tests/cli/test_cli_doctor.py`)."""
     _terminal(monkeypatch, True)
     result = cli_invoke(_SAMPLE_ARGS[command], json=json_mode, http=None,

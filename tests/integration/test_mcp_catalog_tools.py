@@ -69,6 +69,12 @@ from tests.helpers.mcp_client import unreachable_http
 from tests.helpers.secrets import all_secrets
 from tests.helpers.stack_fake import TEST_API_URL, FakeStack
 
+# Banco de questões local: o banco válido no `tmp_path` e a leitura do pacote enviado.
+import base64
+import tarfile
+
+from tests.helpers import banks as bank_fixtures
+
 # --------------------------------------------------------------------------------------------------
 # O catálogo exposto (nenhum total literal: a lista sai do catálogo congelado)
 # --------------------------------------------------------------------------------------------------
@@ -375,6 +381,65 @@ def _dispatch_id_case(targets: Callable[[CallState], str]) -> Callable[[CallStat
     return build
 
 
+# Banco de questões local: o envio do curso de fixture copiado para o `tmp_path`, com um nome neutro. O corpo do
+# pedido é conferido pelo `BankUploadBody` (o pacote não tem bytes fixos: o que se confere são os arquivos dentro dele).
+CATALOG_BANK_NAME = "banco-catalogo"
+
+
+def bank_folder(root: Path) -> Path:
+    """O curso de fixture copiado para `root/banco-catalogo` (uma vez; as chamadas seguintes reusam a cópia), pelo
+    caminho absoluto."""
+    folder = root / "banco-catalogo"
+    if not folder.exists():
+        bank_fixtures.copy_course(folder)
+    return folder.resolve()
+
+
+def _archive_files(encoded: Any) -> dict[str, bytes] | None:
+    """Os arquivos de um pacote em base64 padrão (todo membro regular), ou `None` se não for um pacote assim."""
+    if not isinstance(encoded, str):
+        return None
+    try:
+        data = base64.b64decode(encoded, validate=True)
+        with tarfile.open(fileobj=io.BytesIO(data), mode="r:gz") as tar:
+            members = tar.getmembers()
+            if not all(member.isreg() for member in members):
+                return None
+            files: dict[str, bytes] = {}
+            for member in members:
+                extracted = tar.extractfile(member)
+                if extracted is None:
+                    return None
+                files[member.name] = extracted.read()
+            return files
+    except (ValueError, tarfile.TarError, OSError, EOFError):
+        return None
+
+
+@dataclass(frozen=True, eq=False)
+class BankUploadBody:
+    """O corpo esperado do envio: igual a um `dict` com o nome, a versão de referência dos arquivos, a origem
+    `folder`, o `git_commit` ausente ou nulo e o pacote com exatamente os arquivos dados."""
+
+    name: str
+    files: tuple[tuple[str, bytes], ...] = field(repr=False)
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, dict):
+            return NotImplemented
+        required = {"name", "version", "source", "archive"}
+        files = dict(self.files)
+        return (required <= set(other) <= required | {"git_commit"} and other["name"] == self.name
+                and other["version"] == bank_fixtures.reference_version(files) and other["source"] == "folder"
+                and other.get("git_commit") is None and _archive_files(other["archive"]) == files)
+
+
+def _upload_case(s: CallState, tmp_path: Path) -> Expected:
+    folder = bank_folder(tmp_path)
+    return Expected({"path": str(folder), "name": CATALOG_BANK_NAME}, {},
+                    body=BankUploadBody(CATALOG_BANK_NAME, tuple(bank_fixtures.course_files().items())))
+
+
 CASES: dict[str, Callable[[CallState, Path], Expected]] = {
     "list_people": lambda s, t: Expected({}, {}),
     "get_person": lambda s, t: Expected({"person": s.person["pseudo_id"]}, {"ref": s.person["pseudo_id"]}),
@@ -415,6 +480,9 @@ CASES: dict[str, Callable[[CallState, Path], Expected]] = {
     "run_doctor": lambda s, t: Expected({}, {}),
     "prepare_purge_offering": lambda s, t: Expected({"offering": s.prepare_targets[0]}, {"ref": s.prepare_targets[0]}),
     "purge_offering": _purge_case,
+    # Banco de questões local: o envio do banco do `tmp_path` e a listagem sem filtro
+    "upload_question_bank": _upload_case,
+    "list_question_banks": lambda s, t: Expected({}, {}),
 }
 
 
@@ -440,8 +508,14 @@ def static_arguments(tool: str, roster_path: Path) -> dict[str, Any]:
         "list_report_versions": dispatch, "resend_report_summary": dispatch, "get_offering_digest": offering,
         "update_offering_digest": {**offering, "local_time": "21:00"}, "run_doctor": {},
         "prepare_purge_offering": offering, "purge_offering": confirm,
+        # Banco de questões local: o caminho do banco é montado só quando pedido (abaixo)
+        "upload_question_bank": {"name": CATALOG_BANK_NAME},
+        "list_question_banks": {},
     }
     assert set(table) == set(CATALOG_TOOLS), "a tabela de argumentos estáticos não cobre o catálogo exposto"
+    if tool == "upload_question_bank":
+        # um banco válido no `tmp_path` (o diretório da lista estática): a leitura passa, e a chamada chega ao perfil
+        return {"path": str(bank_folder(roster_path.parent)), **table[tool]}
     return table[tool]
 
 

@@ -22,7 +22,7 @@ import psycopg
 from cq_server import db
 from cq_server.clock import SystemClock
 
-EXPECTED_VERSION = "0007"
+EXPECTED_VERSION = "0008"
 
 MIGRATIONS_PACKAGE = "cq_server.migrations"
 MIGRATION_FILE = re.compile(r"^(\d{4})_[a-z0-9_]+\.sql$")

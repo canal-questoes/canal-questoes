@@ -14,6 +14,7 @@ O cliente HTTP pode ser injetado (`http=`, qualquer objeto com a interface de `h
 
 from __future__ import annotations
 
+import base64
 import urllib.parse
 from collections.abc import Mapping, Sequence
 from typing import Any
@@ -24,6 +25,9 @@ CLIENT_KINDS = ("cli", "mcp", "other")
 CONNECT_TIMEOUT_SECONDS = 5.0
 # Leitura, escrita e pool: generoso, porque a API só responde depois de gravar (nenhuma resposta perdida).
 OTHER_TIMEOUT_SECONDS = 30.0
+# O prazo do envio de um banco de questões (leitura, escrita e pool), só nesse pedido: o pacote pode ter
+# centenas de MB em base64.
+UPLOAD_TIMEOUT_SECONDS = 300.0
 
 UNEXPECTED_RESPONSE_CODE = "unexpected_response"
 
@@ -342,10 +346,30 @@ class ApiClient:
         return self._call("PATCH", _offering_path(ref, "/digest"),
                           json=_drop_none({"enabled": enabled, "local_time": local_time}))
 
+    def upload_bank(self, *, name: str, version: str, source: str, git_commit: str | None,
+                    archive: bytes) -> dict:
+        """`banks.upload` — `POST /v1/question-banks`, com o pacote em base64 no corpo JSON e o prazo de
+        `UPLOAD_TIMEOUT_SECONDS` só neste pedido.
+
+        O corpo tem exatamente os cinco campos, com `git_commit` nulo quando não há commit; o pacote vai em
+        base64 padrão, com preenchimento e sem quebras de linha. O pedido não leva caminho local nenhum: só o
+        nome, a versão, a origem, o commit e o pacote dados."""
+        body = {"name": name, "version": version, "source": source, "git_commit": git_commit,
+                "archive": base64.b64encode(archive).decode("ascii")}
+        return self._call("POST", "/v1/question-banks", json=body,
+                          timeout=httpx2.Timeout(UPLOAD_TIMEOUT_SECONDS, connect=CONNECT_TIMEOUT_SECONDS))
+
+    def list_banks(self, *, name: str | None = None, after: int = 0, limit: int | None = None) -> dict:
+        """`banks.list` — `GET /v1/question-banks`, só com a consulta dada (o cursor vai sempre)."""
+        return self._call("GET", "/v1/question-banks",
+                          params=_drop_none({"name": name, "after": after, "limit": limit}))
+
     # --- transporte ----------------------------------------------------------------------------
 
     def _call(self, method: str, path: str, *, params: Any = None, json: Any = None,
-              accept_statuses: Sequence[int] | None = None, authenticate: bool = True) -> dict:
+              accept_statuses: Sequence[int] | None = None, authenticate: bool = True,
+              timeout: httpx2.Timeout | None = None) -> dict:
+        """`timeout`, quando dado, vale só para este pedido; sem ele, vale o prazo do cliente HTTP."""
         headers = {"X-CQ-Client": self._client_kind}
         if authenticate and self._token is not None:
             headers["Authorization"] = f"Bearer {self._token}"
@@ -354,6 +378,8 @@ class ApiClient:
             kwargs["params"] = params
         if json is not None:
             kwargs["json"] = json
+        if timeout is not None:
+            kwargs["timeout"] = timeout
         try:
             response = self._http.request(method, self.base_url + path, **kwargs)
         except httpx2.TransportError:

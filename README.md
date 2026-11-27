@@ -40,8 +40,9 @@ Os alunos não instalam nada além do Telegram: eles só conversam com o bot do 
   BotFather e registrado no sistema.
 - **Lista e convites.** A lista de alunos entra por um arquivo CSV; cada aluno recebe por e-mail um convite com um link
   que vincula a conta dele no Telegram ao oferecimento.
-- **Disparos.** O professor escolhe uma questão de um repositório git do PrairieLearn, num commit fixo, e a janela em
-  que ela fica aberta; o bot entrega a questão aos alunos vinculados e recebe as respostas no próprio chat.
+- **Disparos.** O professor escolhe uma questão do PrairieLearn e a janela em que ela fica aberta; o bot entrega a
+  questão aos alunos vinculados e recebe as respostas no próprio chat. A questão vem de um repositório git, num commit
+  fixo, ou de um banco enviado de uma pasta de curso do computador do operador (`cq banks upload`), numa versão fixa.
 - **Correção fiel ao PrairieLearn.** O motor de questões roda dentro da imagem oficial do PrairieLearn e corrige com o
   código dele. Ele aceita cinco elementos de resposta (`pl-multiple-choice`, `pl-checkbox`, `pl-number-input`,
   `pl-integer-input` e `pl-string-input`) e alguns elementos de painel e de exibição, como `pl-question-panel`,
@@ -63,7 +64,7 @@ Os alunos não instalam nada além do Telegram: eles só conversam com o bot do 
 
 ## Estado do projeto
 
-A versão atual é a **v0.1.2**. A primeira pública foi a **v0.1.0**. O piloto com alunos de uma disciplina da
+A versão atual é a **v0.1.3**. A primeira pública foi a **v0.1.0**. O piloto com alunos de uma disciplina da
 **Unicamp** ainda não começou; quando começar, ele vai rodar o código desta versão. As versões seguem o
 [SemVer](https://semver.org/lang/pt-BR/) na faixa
 0.y.z: até a 1.0.0, a API, o CLI e os formatos ainda podem mudar de uma versão para outra, e o

@@ -16,11 +16,13 @@ Semente (no banco do teste, pelas rotas e pelos ajudantes das fases anteriores):
   perfil, um token novo com todas as permissões) e o perfil `remoto`; a API dos testes por `http=`.
 
 Em cada era (`MODES`), um servidor por superfície, todos em processo:
-- `principal`: as 36 ferramentas (o conjunto calculado, catálogo exposto ∪ `LOCAL_TOOL_BINDINGS`) com sucesso, as
+- `principal`: as 38 ferramentas (o conjunto calculado, catálogo exposto ∪ `LOCAL_TOOL_BINDINGS`) com sucesso, as
   locais pelo `FakeStack` (nível 1) com as amostras de `tests/helpers/log_samples.py`; o expurgo de `O` pelas
   ferramentas (preparo e confirmação); erros de execução (código errado, alvo inexistente, arquivo da lista
   relativo e fora do formato, código do `down` usado, nada a parar); erros de protocolo com o nome canário na
-  chave e no valor (toda ferramenta) e a ferramenta desconhecida;
+  chave e no valor (toda ferramenta) e a ferramenta desconhecida; o banco de questões local: o envio de um banco
+  válido do `tmp_path` com um nome neutro, a listagem, e as recusas locais (a pasta relativa e a pasta sem
+  `infoCourse.json`), só com a mensagem fixa do motivo;
 - `nivel2`: as 5 locais pelo `FakeRunner` (nível 2), com as mesmas amostras de registros no `docker compose logs`;
 - `sem-permissao`: toda ferramenta da API com um token só de `people:read` (403 com a linha da permissão, salvo as
   de `people:read`; a revelação negada é o controle negativo);
@@ -37,7 +39,8 @@ token inicial, o somente leitura, os tokens de bot, as chaves-mestras, os sentin
 Docker falso. Controle contra o vazio: cada ferramenta com ao menos um sucesso e um erro em cada era.
 
 `test_mcp_canary_subprocess_stderr_has_no_identity_or_secret`: o `cq mcp` num subprocesso, com a API inalcançável
-(`http://127.0.0.1:9`), roda uma chamada de cada ferramenta da API (o erro fixo `api_unreachable`) e erros de
+(`http://127.0.0.1:9`), roda uma chamada de cada ferramenta da API (o erro fixo `api_unreachable`; o envio do banco
+lê um banco válido do `tmp_path` antes do pedido) e erros de
 protocolo com o nome canário; o stderr do filho tem só linhas de `MCP_STDERR_MESSAGES`, sem identidade nem segredo.
 
 No esqueleto, `build_server` lança `NotImplementedError` (o primeiro teste, depois da semente); a folha
@@ -71,6 +74,8 @@ from cq_client.mcp_server import (
     PROTOCOL_MESSAGES,
 )
 from tests.helpers import log_samples, mcp_client
+from tests.helpers import banks as bank_fixtures  # banco de questões local: o banco válido do `tmp_path`
+from cq_client.banks import LOCAL_MESSAGES  # banco de questões local: as mensagens fixas das recusas locais
 from tests.helpers.api import ADMIN_TOKEN, create_offering, create_token, import_students, register_person
 from tests.helpers.calls import SEED_COMMIT, SEED_QID, SEED_REPO, seed_state
 from tests.helpers.canary import (
@@ -359,7 +364,24 @@ def _api_args(world: _World, i: int, list_path: Path) -> dict[str, dict]:
         "run_doctor": {},
         "prepare_purge_offering": {"offering": st.prepare_targets[0]},
         "purge_offering": {"offering": st.purge_targets[1][0], "confirmation_code": st.purge_targets[1][1]},
+        # Banco de questões local: a leitura do banco válido passa, e a API recusa pela permissão
+        "upload_question_bank": {"path": str(_bank(world.tmp_path, f"banco-sem-permissao-{i}")),
+                                 "name": f"banco-proibido-{i}"},
+        "list_question_banks": {},
     }
+
+
+def _bank(root: Path, name: str) -> Path:
+    """Banco de questões local: o curso de fixture copiado para `root/<name>` (uma vez), pelo caminho absoluto."""
+    folder = root / name
+    if not folder.exists():
+        bank_fixtures.copy_course(folder)
+    return folder.resolve()
+
+
+def _bank_read(reason: str) -> str:
+    """Banco de questões local: o texto inteiro de uma recusa local (a chave `bank.read`, só a mensagem fixa)."""
+    return ERROR_TEXT_TEMPLATE.format(code="bank.read", message=LOCAL_MESSAGES[reason])
 
 
 async def _api_success_and_errors(rec: _Recorder, world: _World, i: int, first: bool, folder: Path) -> None:
@@ -451,6 +473,20 @@ async def _api_success_and_errors(rec: _Recorder, world: _World, i: int, first: 
     await rec.error("prepare_purge_offering", {"offering": MISSING_OFFERING})
     await rec.error("purge_offering", {"offering": st.purge_targets[1][0], "confirmation_code": WRONG_CODE})
 
+    # --- banco de questões local: o envio (um nome neutro por era), a listagem e as recusas locais ---
+    bank = _bank(world.tmp_path, f"banco-principal-{i}")
+    not_course = folder / f"banco-sem-curso-{i}"
+    (not_course / "questions" / "q1").mkdir(parents=True)
+    (not_course / "questions" / "q1" / "info.json").write_bytes(b"{}\n")
+    uploaded = await rec.ok("upload_question_bank", {"path": str(bank), "name": f"banco-agente-{i}"})
+    assert (uploaded.structured["name"], uploaded.structured["created"]) == (f"banco-agente-{i}", True)
+    await rec.error("upload_question_bank", {"path": bank.name, "name": f"banco-agente-{i}"},
+                    text=_bank_read("not_absolute"))
+    await rec.error("upload_question_bank", {"path": str(not_course), "name": f"banco-agente-{i}"},
+                    text=_bank_read("not_a_course"))
+    listed = await rec.ok("list_question_banks", {"name": f"banco-agente-{i}"})
+    assert [item["name"] for item in listed.structured["items"]] == [f"banco-agente-{i}"]
+
     # --- a revelação: com as pessoas (controle positivo) e só com pseudônimos inexistentes (controle negativo) ---
     await rec.ok("reveal_identities", {"pseudonyms": [world.people[p.name]["pseudo_id"] for p in CANARY_PEOPLE],
                                        "reason": REVEAL_REASON}, label=REVEAL)
@@ -541,7 +577,7 @@ async def _era(world: _World, mode: str, i: int, run: _Run) -> None:
 
 def test_mcp_canary_sweep_finds_no_identity_or_secret_outside_reveal(
         client: Any, sql: psycopg.Connection, clock: Any, tmp_path: Path, bot_api: Any) -> None:
-    """Ver o docstring do módulo: as 36 ferramentas (o conjunto calculado) com sucesso e com
+    """Ver o docstring do módulo: as 38 ferramentas (o conjunto calculado) com sucesso e com
     erro nas duas eras, sobre a semente canário das fases anteriores (inclusive o expurgo); zero identidade fora do sucesso da
     `reveal_identities` com pessoas, salvo as exceções do expurgo com controle positivo e contagem exata; zero segredo;
     o `tools/list` e o `deps.stderr` de cada servidor varridos; controles positivos do detector e contra o vazio.
@@ -663,6 +699,9 @@ def test_mcp_canary_subprocess_stderr_has_no_identity_or_secret(tmp_path: Path, 
         "run_doctor": {},
         "prepare_purge_offering": {"offering": ref},
         "purge_offering": {"offering": ref, "confirmation_code": WRONG_CODE},
+        # Banco de questões local: a leitura do banco válido passa antes do pedido à API inalcançável
+        "upload_question_bank": {"path": str(_bank(tmp_path, "banco-subprocesso")), "name": "banco-subprocesso"},
+        "list_question_banks": {},
     }
     assert set(args) == set(_catalog_tools())
     env = {"CQ_CONFIG": str(tmp_path / mcp_client.MISSING_PROFILE_FILE), "CQ_API_URL": UNREACHABLE_API_URL,

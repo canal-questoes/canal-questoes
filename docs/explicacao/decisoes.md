@@ -44,14 +44,20 @@ ficou como evolução, no [roadmap](../../ROADMAP.md).
 
 ### O banco de questões fica de fora
 
-A primeira decisão foi não trazer para o sistema o domínio de geração e gestão das questões. O sistema não tem um
-banco próprio: recebe uma referência imutável à questão (o repositório, o *commit* e o QID, o identificador da questão
-no repositório), num pedido de disparo imediato ou agendado. O conteúdo e a organização do banco ficam com os
-projetos que o produzem.
+A primeira decisão foi não trazer para o sistema o domínio de geração e gestão das questões. O sistema não edita, não
+gera nem interpreta as questões: recebe uma referência imutável à questão (o banco, a versão fixada e o QID, o
+identificador da questão no curso), num pedido de disparo imediato ou agendado, e entrega o conteúdo ao motor. O
+conteúdo e a organização do banco ficam com os projetos que o produzem.
+
+O banco é um repositório git num *commit* ou, desde a versão 0.1.3, um banco enviado pelo operador: o CLI ou o
+servidor MCP leem a pasta do curso no computador dele, ou um *commit* de um git local, e enviam o pacote à API. O
+servidor guarda o pacote como chegou, imutável e identificado pelo hash SHA-256 do conteúdo, que faz o papel do
+*commit*. O envio atende o curso que só existe numa pasta ou num git local, sem um repositório remoto, e não muda a
+fronteira: o pacote guardado não é um banco gerido pelo sistema, e o curso continua sendo organizado na origem dele.
 
 A alternativa, importar as questões para um repositório interno, acoplaria o canal à forma como cada projeto organiza
 o seu acervo. Com a referência, usar as questões de outro projeto do grupo exige só apontar outro repositório, num
-host permitido (`CQ_REPO_ALLOWED_HOSTS`).
+host permitido (`CQ_REPO_ALLOWED_HOSTS`), ou enviar a pasta do curso com `cq banks upload`.
 
 ### Correção direta agora, feedback elaborado depois
 
@@ -173,7 +179,7 @@ uma semana de trabalho, o que consumia a folga do cronograma.
 
 A mitigação foi um **catálogo único de operações**: cada caso de uso nasce de uma vez como endpoint, comando da linha de
 comando e, quando faz sentido, ferramenta MCP. Assim, o servidor MCP cresceu junto com o resto do sistema, em vez de
-virar uma fase isolada no fim, e chegou a 36 ferramentas ([referência do MCP](../referencia/mcp.md)).
+virar uma fase isolada no fim, e chegou a 38 ferramentas ([referência do MCP](../referencia/mcp.md)).
 
 A decisão tem um efeito sobre a privacidade, tratado a seguir: tudo o que as ferramentas devolvem chega ao provedor do
 modelo de linguagem.

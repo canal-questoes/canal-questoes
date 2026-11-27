@@ -69,6 +69,14 @@ import click
 
 from cq_client import doctor, local_commands, local_ops
 from cq_client.api import ApiClient, ApiError, ApiUnreachable
+from cq_client.banks import (
+    LOCAL_MESSAGES,
+    BankReadError,
+    bank_version,
+    build_archive,
+    read_folder,
+    read_git,
+)
 from cq_client.hint import local_stack_hint
 from cq_client.host_probe import DockerHostProbe, HostProbe
 from cq_client.local_commands import (
@@ -113,7 +121,7 @@ from cq_client.stack import (
     check_docker_target,
     locate_stack_dir,
 )
-from cq_client.stack_compose import ComposeStack, SubprocessRunner
+from cq_client.stack_compose import ComposeStack, GitRunner, SubprocessRunner
 
 _T = typing.TypeVar("_T")
 
@@ -1992,6 +2000,95 @@ def reports_resend(ref: str, dispatch_id: str) -> None:
     (reports.resend_summary)."""
     body = _request(lambda api: api.resend_report_summary(ref, dispatch_id))
     _emit(body, lambda b: [f"Resumo reenviado: {b['dispatch_id']}, versão {b['frozen']['version']}."])
+
+
+# --- banco de questões local ----------------------------------------------------------------------
+
+
+@cli.group("banks")
+def banks_group() -> None:
+    """Bancos de questões locais (uma pasta de curso ou um commit de um git local)."""
+
+
+def _bank_refusal(exc: BankReadError) -> NoReturn:
+    """A recusa local da leitura do banco: a mensagem fixa do motivo e, quando há, o caminho relativo dentro do
+    banco, neutralizado; código de uso incorreto e nenhum pedido à API. O caminho local da pasta nunca sai."""
+    message = LOCAL_MESSAGES.get(exc.reason, LOCAL_MESSAGES["unreadable"])
+    _echo_err(f"Uso incorreto: {message}")
+    if exc.relative_path is not None:
+        _echo_err(f"Caminho no banco: {_terminal_safe(exc.relative_path)}")
+    raise _Done(EXIT_USAGE)
+
+
+def _read_bank(folder: str, revision: str | None) -> tuple[str, str | None, str, bytes]:
+    """Lê a pasta (ou, com `revision`, o commit do git local), confere as regras, calcula a versão e monta o
+    pacote; devolve a origem, o commit, a versão e o pacote. Toda recusa sai antes de qualquer pedido à API.
+
+    O caminho digitado pode ser relativo ao diretório atual: vira absoluto aqui, sem tocar o disco."""
+    try:
+        try:
+            root = os.path.abspath(folder)
+        except (OSError, ValueError):
+            raise BankReadError("not_found") from None
+        if revision is None:
+            bank = read_folder(root)
+        else:
+            bank = read_git(root, revision, GitRunner())
+        version = bank_version(bank.entries)
+        archive = build_archive(bank.entries)
+    except BankReadError as exc:
+        _bank_refusal(exc)
+    source = "folder" if revision is None else "git"
+    return source, bank.git_commit, version, archive
+
+
+def _bank_upload_lines(body: dict) -> list[str]:
+    """As linhas de `banks upload`, todas pelos valores da resposta (o nome e o `repo` são texto livre)."""
+    state = "nova" if body["created"] else "já existia"
+    origin = ("Origem: folder." if body["source"] == "folder"
+              else f"Origem: {_terminal_safe(body['source'])}, commit {_terminal_safe(body['git_commit'])}.")
+    version = _terminal_safe(body["version"])
+    return [
+        f"Banco enviado: {_terminal_safe(body['name'])}, versão {version} ({state}).",
+        origin,
+        f"Arquivos: {body['file_count']}; bytes: {body['byte_count']}; questões: {body['question_count']}.",
+        f"Para disparar: cq dispatches prepare <oferecimento> --repo {_terminal_safe(body['repo'])} "
+        f"--commit {version} --qid <qid>",
+    ]
+
+
+def _bank_list_line(item: dict) -> str:
+    """Uma versão de `banks list`: nome, versão, referência, origem, commit (ou `-`), contagens e horário."""
+    return "  ".join([
+        _terminal_safe(item["name"]), _terminal_safe(item["version"]), _terminal_safe(item["repo"]),
+        _terminal_safe(item["source"]), _terminal_safe(_dash(item["git_commit"])), str(item["file_count"]),
+        str(item["byte_count"]), str(item["question_count"]), _terminal_safe(item["created_at"]),
+    ])
+
+
+@banks_group.command("upload")
+@click.argument("folder", metavar="PASTA")
+@click.option("--name", required=True, metavar="NOME", help="Nome do banco (minúsculas, dígitos e hífen; de 3 a 40).")
+@click.option("--git", "revision", default=None, metavar="REVISÃO",
+              help="Envia o commit desta revisão do git local (ramo, tag ou hash), não a pasta como está.")
+def banks_upload(folder: str, name: str, revision: str | None) -> None:
+    """Lê, confere, empacota e envia um banco de questões local (banks.upload)."""
+    profile = _profile()
+    source, git_commit, version, archive = _read_bank(folder, revision)
+    body = _request(lambda api: api.upload_bank(name=name, version=version, source=source,
+                                                git_commit=git_commit, archive=archive), profile)
+    _emit(body, _bank_upload_lines)
+
+
+@banks_group.command("list")
+@click.option("--name", default=None, metavar="NOME", help="Só as versões do banco com este nome exato.")
+@click.option("--after", type=int, default=None, help="Cursor: só versões depois dele.")
+@click.option("--limit", type=int, default=None, help="Máximo de itens (1 a 500).")
+def banks_list(name: str | None, after: int | None, limit: int | None) -> None:
+    """Lista os bancos enviados e as versões de cada um, em ordem do primeiro envio (banks.list)."""
+    body = _request(lambda api: api.list_banks(name=name, after=0 if after is None else after, limit=limit))
+    _emit(body, lambda b: [*(_bank_list_line(item) for item in b["items"]),
+                           f"Próximo cursor: {b['next_cursor']}"])
 
 
 def main() -> None:
